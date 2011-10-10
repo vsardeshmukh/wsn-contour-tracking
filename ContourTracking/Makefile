@@ -1,0 +1,3 @@
+COMPONENT=ContourTrackingAppC
+
+include $(MAKERULES)
