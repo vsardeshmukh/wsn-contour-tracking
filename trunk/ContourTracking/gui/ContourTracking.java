@@ -11,6 +11,7 @@
 import net.tinyos.message.*;
 import net.tinyos.util.*;
 import java.io.*;
+import java.util.*;
 
 /* The "ContourTracking" demo app. Displays graphs showing data received from
    the ContourTracking mote application, and allows the user to:
@@ -33,98 +34,107 @@ import java.io.*;
    Note that the messageReceived method below is synchronized, so no further
    synchronization is needed when updating state based on received messages.
 */
-public class ContourTracking implements MessageListener
+
+public class ContourTracking extends TimerTask implements MessageListener
 {
-    MoteIF mote;
-    Data data;
-    Window window;
+	MoteIF mote;
+	Data data;
+	Window window;
 
-    /* The current sampling period. If we receive a message from a mote
-       with a newer version, we update our interval. If we receive a message
-       with an older version, we broadcast a message with the current interval
-       and version. If the user changes the interval, we increment the
-       version and broadcast the new interval and version. */
-    int interval = Constants.DEFAULT_INTERVAL;
-    int version = -1;
+	/* The current sampling period. If we receive a message from a mote
+	   with a newer version, we update our interval. If we receive a message
+	   with an older version, we broadcast a message with the current interval
+	   and version. If the user changes the interval, we increment the
+	   version and broadcast the new interval and version. */
+	int interval = Constants.DEFAULT_INTERVAL;
+	int version = -1;
 
-    /* Main entry point */
-    void run() {
-    data = new Data(this);
-    window = new Window(this);
-    window.setup();
-    mote = new MoteIF(PrintStreamMessenger.err);
-    mote.registerListener(new ContourTrackingMsg(), this);
-    }
+	/* TimerTask: update motes clock periodically */
+	public void run() {
+		sendInterval();
+	}
 
-    /* The data object has informed us that nodeId is a previously unknown
-       mote. Update the GUI. */
-    void newNode(int nodeId) {
-    window.newNode(nodeId);
-    }
+	/* Main entry point */
+	void exec() {
+		data = new Data(this);
+		window = new Window(this);
+		window.setup();
+		mote = new MoteIF(PrintStreamMessenger.err);
+		mote.registerListener(new ContourTrackingMsg(), this);
+		new Timer().schedule(this, 0, 1000);
+	}
 
-    public synchronized void messageReceived(int dest_addr, 
-            Message msg) {
-    if (msg instanceof ContourTrackingMsg) {
-        ContourTrackingMsg omsg = (ContourTrackingMsg)msg;
+	/* The data object has informed us that nodeId is a previously unknown
+	   mote. Update the GUI. */
+	void newNode(int nodeId) {
+		window.newNode(nodeId);
+	}
 
-        /* Update interval and mote data */
-        periodUpdate(omsg.get_version(), omsg.get_interval());
-        data.update(omsg.get_id(), omsg.get_count(), omsg.get_readings());
+	public synchronized void messageReceived(int dest_addr, 
+			Message msg) {
+		if (msg instanceof ContourTrackingMsg) {
+			ContourTrackingMsg omsg = (ContourTrackingMsg)msg;
 
-        /* Inform the GUI that new data showed up */
-        window.newData();
-    }
-    }
+			/* Update interval and mote data */
+			periodUpdate(omsg.get_version(), omsg.get_interval());
+			data.update(omsg.get_id(), omsg.get_count(), omsg.get_readings());
+			//System.out.println("mote[" + omsg.get_id() + "] msg seq: " + omsg.get_count() + " with ts: " + omsg.get_clock() + " at " + System.currentTimeMillis());
 
-    /* A potentially new version and interval has been received from the
-       mote */
-    void periodUpdate(int moteVersion, int moteInterval) {
-    if (moteVersion > version) {
-        /* It's new. Update our vision of the interval. */
-        version = moteVersion;
-        interval = moteInterval;
-        window.updateSamplePeriod();
-    }
-    else if (moteVersion < version) {
-        /* It's old. Update the mote's vision of the interval. */
-        sendInterval();
-    }
-    }
+			/* Inform the GUI that new data showed up */
+			window.newData();
+		}
+	}
 
-    /* The user wants to set the interval to newPeriod. Refuse bogus values
-       and return false, or accept the change, broadcast it, and return
-       true */
-    synchronized boolean setInterval(int newPeriod) {
-    if (newPeriod < 1 || newPeriod > 65535) {
-        return false;
-    }
-    interval = newPeriod;
-    version++;
-    sendInterval();
-    return true;
-    }
+	/* A potentially new version and interval has been received from the
+	   mote */
+	void periodUpdate(int moteVersion, int moteInterval) {
+		if (moteVersion > version) {
+			/* It's new. Update our vision of the interval. */
+			version = moteVersion;
+			interval = moteInterval;
+			window.updateSamplePeriod();
+		}
+		else if (moteVersion < version) {
+			/* It's old. Update the mote's vision of the interval. */
+			sendInterval();
+		}
+	}
 
-    /* Broadcast a version+interval message. */
-    void sendInterval() {
-    ContourTrackingMsg omsg = new ContourTrackingMsg();
+	/* The user wants to set the interval to newPeriod. Refuse bogus values
+	   and return false, or accept the change, broadcast it, and return
+	   true */
+	synchronized boolean setInterval(int newPeriod) {
+		if (newPeriod < 1 || newPeriod > 65535) {
+			return false;
+		}
+		interval = newPeriod;
+		version++;
+		sendInterval();
+		return true;
+	}
 
-    omsg.set_version(version);
-    omsg.set_interval(interval);
-    try {
-        mote.send(MoteIF.TOS_BCAST_ADDR, omsg);
-    }
-    catch (IOException e) {
-        window.error("Cannot send message to mote");
-    }
-    }
+	/* Broadcast a version+interval message. */
+	void sendInterval() {
+		ContourTrackingMsg omsg = new ContourTrackingMsg();
 
-    /* User wants to clear all data. */
-    void clear() {
-    data = new Data(this);
-    }
+		omsg.set_version(version);
+		omsg.set_interval(interval);
+		omsg.set_clock(System.currentTimeMillis());
+		try {
+			mote.send(MoteIF.TOS_BCAST_ADDR, omsg);
+		}
+		catch (IOException e) {
+			window.error("Cannot send message to mote");
+		}
+	}
 
-    public static void main(String[] args) {
-    ContourTracking me = new ContourTracking();
-    me.run();
-    }
+	/* User wants to clear all data. */
+	void clear() {
+		data = new Data(this);
+	}
+
+	public static void main(String[] args) {
+		ContourTracking me = new ContourTracking();
+		me.exec();
+	}
 }

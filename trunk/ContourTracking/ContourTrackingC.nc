@@ -53,6 +53,7 @@ implementation
   event void Boot.booted() {
     local.interval = DEFAULT_INTERVAL;
     local.id = TOS_NODE_ID;
+    local.clock = 0;
     if (call RadioControl.start() != SUCCESS)
       report_problem();
   }
@@ -70,26 +71,27 @@ implementation
   }
 
   event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len) {
-    contourtracking_t *omsg = payload;
+		contourtracking_t *omsg = payload;
 
-    report_received();
+		report_received();
 
-    /* If we receive a newer version, update our interval. 
-       If we hear from a future count, jump ahead but suppress our own change
-    */
-    if (omsg->version > local.version)
-      {
-	local.version = omsg->version;
-	local.interval = omsg->interval;
-	startTimer();
-      }
-    if (omsg->count > local.count)
-      {
-	local.count = omsg->count;
-	suppressCountChange = TRUE;
-      }
+		/* If we receive a newer version, update our interval. 
+			 If we hear from a future count, jump ahead but suppress our own change
+		 */
+		if (omsg->version > local.version)
+		{
+			local.version = omsg->version;
+			local.interval = omsg->interval;
+			startTimer();
+		}
+		if (omsg->count > local.count)
+		{
+			local.count = omsg->count;
+			suppressCountChange = TRUE;
+		}
 
-    return msg;
+		local.clock = omsg->clock;
+		return msg;
   }
 
   /* At each sample period:
@@ -97,28 +99,33 @@ implementation
      - read next sample
   */
   event void Timer.fired() {
-    if (reading == NREADINGS)
-      {
-	if (!sendBusy && sizeof local <= call AMSend.maxPayloadLength())
-	  {
-	    // Don't need to check for null because we've already checked length
-	    // above
-	    memcpy(call AMSend.getPayload(&sendBuf, sizeof(local)), &local, sizeof local);
-	    if (call AMSend.send(AM_BROADCAST_ADDR, &sendBuf, sizeof local) == SUCCESS)
-	      sendBusy = TRUE;
-	  }
-	if (!sendBusy)
-	  report_problem();
+		  if (reading == NREADINGS)
+		  {
+				  if (!sendBusy && sizeof local <= call AMSend.maxPayloadLength())
+				  {
+						  // Don't need to check for null because we've already checked length
+						  // above
+						  memcpy(call AMSend.getPayload(&sendBuf, sizeof(local)), &local, sizeof local);
+						  if (call AMSend.send(AM_BROADCAST_ADDR, &sendBuf, sizeof local) == SUCCESS)
+								  sendBusy = TRUE;
+				  }
 
-	reading = 0;
-	/* Part 2 of cheap "time sync": increment our count if we didn't
-	   jump ahead. */
-	if (!suppressCountChange)
-	  local.count++;
-	suppressCountChange = FALSE;
-      }
-    if (call Read.read() != SUCCESS)
-      report_problem();
+				  if (!sendBusy)
+						  report_problem();
+
+				  reading = 0;
+				  /* Part 2 of cheap "time sync": increment our count if we didn't
+					 jump ahead. */
+				  if (!suppressCountChange)
+						  local.count++;
+				  suppressCountChange = FALSE;
+		  }
+
+			if (local.clock > 0) {
+		  	local.clock += local.interval;
+		  	if (call Read.read() != SUCCESS)
+				  report_problem();
+			}
   }
 
   event void AMSend.sendDone(message_t* msg, error_t error) {

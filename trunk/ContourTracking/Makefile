@@ -1,3 +1,4 @@
 COMPONENT=ContourTrackingAppC
+CFLAGS += -DTOSH_DATA_LENGTH=36
 
 include $(MAKERULES)
