@@ -99,33 +99,11 @@ implementation
      - read next sample
   */
   event void Timer.fired() {
-		  if (reading == NREADINGS)
-		  {
-				  if (!sendBusy && sizeof local <= call AMSend.maxPayloadLength())
-				  {
-						  // Don't need to check for null because we've already checked length
-						  // above
-						  memcpy(call AMSend.getPayload(&sendBuf, sizeof(local)), &local, sizeof local);
-						  if (call AMSend.send(AM_BROADCAST_ADDR, &sendBuf, sizeof local) == SUCCESS)
-								  sendBusy = TRUE;
-				  }
-
-				  if (!sendBusy)
-						  report_problem();
-
-				  reading = 0;
-				  /* Part 2 of cheap "time sync": increment our count if we didn't
-					 jump ahead. */
-				  if (!suppressCountChange)
-						  local.count++;
-				  suppressCountChange = FALSE;
-		  }
-
-			if (local.clock > 0) {
-		  	local.clock += local.interval;
-		  	if (call Read.read() != SUCCESS)
-				  report_problem();
-			}
+	if (local.clock > 0) {
+	  local.clock += local.interval;
+	  if (call Read.read() != SUCCESS)
+		report_problem();
+	}
   }
 
   event void AMSend.sendDone(message_t* msg, error_t error) {
@@ -144,5 +122,28 @@ implementation
 	report_problem();
       }
     local.readings[reading++] = data;
+
+	// send readings immediately when the buffer is full in case of delay.
+	if (reading == NREADINGS)
+	{
+	  if (!sendBusy && sizeof local <= call AMSend.maxPayloadLength())
+	  {
+		// Don't need to check for null because we've already checked length
+		// above
+		memcpy(call AMSend.getPayload(&sendBuf, sizeof(local)), &local, sizeof local);
+		if (call AMSend.send(AM_BROADCAST_ADDR, &sendBuf, sizeof local) == SUCCESS)
+		  sendBusy = TRUE;
+	  }
+
+	  if (!sendBusy)
+		report_problem();
+
+	  reading = 0;
+	  /* Part 2 of cheap "time sync": increment our count if we didn't
+		 jump ahead. */
+	  if (!suppressCountChange)
+		local.count++;
+	  suppressCountChange = FALSE;
+	}
   }
 }
