@@ -42,8 +42,8 @@ class Window {
 		/* Initial mote colors cycle through this list. Add more colors if
 			 you want. */
 		private Color[] cycle = {
-			Color.RED, Color.WHITE, Color.GREEN, Color.MAGENTA,
-			Color.YELLOW, Color.GRAY, Color.YELLOW
+			Color.RED, Color.PINK, Color.GREEN, Color.MAGENTA,
+			Color.YELLOW, Color.BLUE, Color.YELLOW
 		};
 		int cycleIndex;
 
@@ -157,7 +157,7 @@ class Window {
 		JPanel main = new JPanel(new BorderLayout());
 
 		main.setMinimumSize(new Dimension(500, 250));
-		main.setPreferredSize(new Dimension(800, 800));
+		main.setPreferredSize(new Dimension(800, 600));
 
 		// Three panels: mote list, graph, controls
 		moteListModel = new  MoteTableModel();
