@@ -52,6 +52,7 @@ implementation
 
   event void Boot.booted() {
     local.interval = DEFAULT_INTERVAL;
+    local.threshold = DEFAULT_THRESHOLD;
     local.id = TOS_NODE_ID;
     local.clock = 0;
     if (call RadioControl.start() != SUCCESS)
@@ -82,6 +83,7 @@ implementation
 		{
 			local.version = omsg->version;
 			local.interval = omsg->interval;
+			local.threshold = omsg->threshold;
 			startTimer();
 		}
 		if (omsg->count > local.count)

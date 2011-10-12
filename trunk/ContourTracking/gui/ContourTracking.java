@@ -47,11 +47,12 @@ public class ContourTracking extends TimerTask implements MessageListener
 	   and version. If the user changes the interval, we increment the
 	   version and broadcast the new interval and version. */
 	int interval = Constants.DEFAULT_INTERVAL;
+	int threshold = Constants.DEFAULT_THRESHOLD;
 	int version = -1;
 
 	/* TimerTask: update motes clock periodically */
 	public void run() {
-		sendInterval();
+		sendBeacon();
 	}
 
 	/* Main entry point */
@@ -85,8 +86,7 @@ public class ContourTracking extends TimerTask implements MessageListener
 		}
 	}
 
-	/* A potentially new version and interval has been received from the
-	   mote */
+	/* A potentially new version and interval has been received from the mote */
 	void periodUpdate(int moteVersion, int moteInterval) {
 		if (moteVersion > version) {
 			/* It's new. Update our vision of the interval. */
@@ -96,7 +96,7 @@ public class ContourTracking extends TimerTask implements MessageListener
 		}
 		else if (moteVersion < version) {
 			/* It's old. Update the mote's vision of the interval. */
-			sendInterval();
+			sendBeacon();
 		}
 	}
 
@@ -109,16 +109,30 @@ public class ContourTracking extends TimerTask implements MessageListener
 		}
 		interval = newPeriod;
 		version++;
-		sendInterval();
+		sendBeacon();
+		return true;
+	}
+
+	/* The user wants to set the threshold to newThreshold. Refuse bogus values
+	   and return false, or accept the change, broadcast it, and return
+	   true */
+	synchronized boolean setThreshold(int newThreshold) {
+		if (newThreshold < 1 || newThreshold > 1000) {
+			return false;
+		}
+		threshold = newThreshold;
+		version++;
+		sendBeacon();
 		return true;
 	}
 
 	/* Broadcast a version+interval message. */
-	void sendInterval() {
+	void sendBeacon() {
 		ContourTrackingMsg omsg = new ContourTrackingMsg();
 
 		omsg.set_version(version);
 		omsg.set_interval(interval);
+		omsg.set_threshold(threshold);
 		omsg.set_clock(System.currentTimeMillis());
 		try {
 			mote.send(MoteIF.TOS_BCAST_ADDR, omsg);

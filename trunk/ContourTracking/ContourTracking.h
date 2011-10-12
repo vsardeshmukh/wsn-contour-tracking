@@ -20,6 +20,7 @@ enum {
 
   /* Default sampling period. */
   DEFAULT_INTERVAL = 50,
+  DEFAULT_THRESHOLD = 500,
 
   AM_CONTOURTRACKING = 0x93
 };
@@ -27,6 +28,7 @@ enum {
 typedef nx_struct contourtracking {
   nx_uint16_t version; /* Version of the interval. */
   nx_uint16_t interval; /* Samping period. */
+  nx_uint16_t threshold; /* Sample threshold. */
   nx_uint16_t id; /* Mote id of sending mote. */
   nx_int64_t clock; /* timestamp of the last sample. */
   nx_uint16_t count; /* The readings are samples count * NREADINGS onwards */

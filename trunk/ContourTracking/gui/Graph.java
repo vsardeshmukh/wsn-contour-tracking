@@ -73,13 +73,8 @@ class Graph extends JPanel
 		gx0 = 0; gx1 = MIN_WIDTH << scale;
 	}
 
-	void rightDrawString(
-			Graphics2D g, 
-			String s, 
-			int x, 
-			int y) {
-		TextLayout layout =
-			new TextLayout(s, parent.smallFont, g.getFontRenderContext());
+	void rightDrawString(Graphics2D g, String s, int x, int y) {
+		TextLayout layout =	new TextLayout(s, parent.smallFont, g.getFontRenderContext());
 		Rectangle2D bounds = layout.getBounds();
 		layout.draw(g, x - (float)bounds.getWidth(), y + (float)bounds.getHeight() / 2);
 	}
@@ -236,8 +231,7 @@ class Graph extends JPanel
 	/* User attempted to set Y-axis range to newy0..newy1. Refuse bogus
 	   values (return false), or accept, redraw and return true. */
 	boolean setYAxis(int newy0, int newy1) {
-		if (newy0 >= newy1 || newy0 < 0 || newy0 > 65535 ||
-				newy1 < 0 || newy1 > 65535) {
+		if (newy0 >= newy1 || newy0 < 0 || newy0 > 65535 ||	newy1 < 0 || newy1 > 65535) {
 			return false;
 		}
 		gy0 = newy0;
