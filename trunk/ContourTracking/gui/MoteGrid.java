@@ -112,19 +112,23 @@ class MoteGrid extends JPanel
 			for (int i = 0; i < (count > 16 ? 16 : count) ; i++) {
 				boolean same = true;
 				int mote[] = (int[])motes.elementAt(i);
-				if(i > 0 && (i % DIM) > 0) // left neight
+				if(i > 0 && (i % DIM) > 0) {// left neight
 					same = mote[2] == ((int[])motes.elementAt(i-1))[2];
+					//System.out.println(i+"th mote[" + mote[0] + "] with contour value: " + mote[2] + " while L mote[" + ((int[])motes.elementAt(i-1))[0] + "] has value " + ((int[])motes.elementAt(i-1))[2]);
+				}
 
-				if(same && (i < count - 1 && (i % DIM) < 2)) // right neighbor
+				if(same && (i < count - 1 && (i % DIM) < DIM-1)) { // right neighbor
 					same = mote[2] == ((int[])motes.elementAt(i+1))[2];
+					//System.out.println(i+"th mote[" + mote[0] + "] with contour value: " + mote[2] + " while R mote[" + ((int[])motes.elementAt(i+1))[0] + "] has value " + ((int[])motes.elementAt(i+1))[2]);
+				}
 
 				if(same && i > DIM - 1) // bottom neighbor
 					same = mote[2] == ((int[])motes.elementAt(i-DIM))[2];
 
-				if(i+DIM < count) // top neighbor
+				if(same && i+DIM < count) // top neighbor
 					same = mote[2] == ((int[])motes.elementAt(i+DIM))[2];
 
-				// WHITE = 0, BLACK = 1, GREY = 2
+				// BLACK = 0, WHITE = 1, GREY = 2
 				mote[3] = same ? mote[2] : 2;
 
 				// draw mote on the grid
@@ -137,16 +141,16 @@ class MoteGrid extends JPanel
 					clipped.fillRect(moteX-radius, moteY-radius, 2*radius, 2*radius);
 					clipped.setColor(Color.WHITE);
 					clipped.drawRect(moteX-radius, moteY-radius, 2*radius, 2*radius);
-					clipped.setColor(parent.moteListModel.getColor(i));
+					clipped.setColor(Color.WHITE);
 					clipped.drawString(String.valueOf(mote[0]), moteX-3, moteY+4);
 				} else { // white or gray
 					clipped.setColor(mote[3] == 1 ? Color.WHITE : Color.GRAY);
 					clipped.fillRect(moteX-radius, moteY-radius, 2*radius, 2*radius);
-					clipped.setColor(parent.moteListModel.getColor(i));
+					clipped.setColor(mote[3] == 1 ? Color.BLACK : Color.RED);
 					clipped.drawString(String.valueOf(mote[0]), moteX-3, moteY+4);
 				}
 				//System.out.println("mote[" + mote[0] +"] row: " + row + ", col: " + col + ", x: " + moteX + ", y: " + moteY + ", count: " + count + ", DIM: " + DIM);
-				//System.out.println("mote[" + mote[0] + "] sample: " + mote[1] + ", threshold: " + parent.parent.threshold + ", contour: " + mote[2] + "color: " + mote[3]);
+				//System.out.println("mote[" + mote[0] + "] sample: " + mote[1] + ", threshold: " + parent.parent.threshold + ", contour: " + mote[2] + ", same: " + (same ? "true": "false") + ", color: " + mote[3]);
 			}
 		}
 	}
