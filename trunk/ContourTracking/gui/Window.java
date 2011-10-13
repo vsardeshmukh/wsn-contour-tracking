@@ -43,7 +43,7 @@ class Window {
 			 you want. */
 		private Color[] cycle = {
 			Color.RED, Color.PINK, Color.GREEN, Color.MAGENTA,
-			Color.YELLOW, Color.BLUE, Color.YELLOW
+			Color.CYAN, Color.BLUE, Color.ORANGE,
 		};
 		int cycleIndex;
 
