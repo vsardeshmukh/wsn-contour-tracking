@@ -79,7 +79,7 @@ public class ContourTracking extends TimerTask implements MessageListener
 			/* Update interval and mote data */
 			periodUpdate(omsg.get_version(), omsg.get_interval());
 			data.update(omsg.get_id(), omsg.get_count(), omsg.get_readings());
-			//System.out.println("mote[" + omsg.get_id() + "] msg seq: " + omsg.get_count() + " with ts: " + omsg.get_clock() + " at " + System.currentTimeMillis());
+			System.out.println("mote[" + omsg.get_id() + "] msg seq: " + omsg.get_count() + " with clock: " + omsg.get_clock() + ", local ts: " + omsg.get_ftsp_local_timestamp() + ", global ts: " + omsg.get_ftsp_global_timestamp() + ", root id: " + omsg.get_ftsp_root_id() + ", skew: " + omsg.get_ftsp_skew() + ", synced: " + omsg.get_ftsp_synced() + " at " + System.currentTimeMillis());
 
 			/* Inform the GUI that new data showed up */
 			window.newData();
