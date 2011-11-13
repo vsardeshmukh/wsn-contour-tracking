@@ -26,6 +26,14 @@ module ContourTrackingC
     interface Timer<TMilli>;
     interface Read<uint16_t>;
     interface Leds;
+
+		interface GlobalTime<TMilli>;
+		interface TimeSyncInfo;
+		interface Packet;
+		interface PacketTimeStamp<TMilli, uint32_t>;
+
+		//interface LocalTime<TMilli> as LocalTime;
+		//interface TimeSyncAMSend<TMilli, uint32_t> as AMSend;
   }
 }
 implementation
@@ -118,6 +126,7 @@ implementation
   }
 
   event void Read.readDone(error_t result, uint16_t data) {
+		uint32_t timestamp = call GlobalTime.getLocalTime(); //call LocalTime.get();
     if (result != SUCCESS)
       {
 	data = 0xffff;
@@ -132,6 +141,13 @@ implementation
 	  {
 		// Don't need to check for null because we've already checked length
 		// above
+		local.ftsp_local_timestamp = timestamp;
+		local.ftsp_synced = (call GlobalTime.local2Global(&timestamp) == SUCCESS);
+		local.ftsp_global_timestamp = timestamp;
+		local.ftsp_root_id = call TimeSyncInfo.getRootID();
+		local.ftsp_seq = call TimeSyncInfo.getSeqNum();
+		local.ftsp_table_entries = call TimeSyncInfo.getNumEntries();
+		local.ftsp_skew = call TimeSyncInfo.getSkew();
 		memcpy(call AMSend.getPayload(&sendBuf, sizeof(local)), &local, sizeof local);
 		if (call AMSend.send(AM_BROADCAST_ADDR, &sendBuf, sizeof local) == SUCCESS)
 		  sendBusy = TRUE;

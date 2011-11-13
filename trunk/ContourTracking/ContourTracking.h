@@ -30,9 +30,16 @@ typedef nx_struct contourtracking {
   nx_uint16_t interval; /* Samping period. */
   nx_uint16_t threshold; /* Sample threshold. */
   nx_uint16_t id; /* Mote id of sending mote. */
-  nx_int64_t clock; /* timestamp of the last sample. */
   nx_uint16_t count; /* The readings are samples count * NREADINGS onwards */
   nx_uint16_t readings[NREADINGS];
+	nx_uint64_t clock; /* microsecs clock timestamp */
+	nx_uint32_t    ftsp_local_timestamp; 
+	nx_uint32_t    ftsp_global_timestamp;
+	nx_uint16_t    ftsp_root_id;
+	nx_uint8_t     ftsp_synced;
+	nx_uint8_t     ftsp_seq;
+	nx_uint8_t     ftsp_table_entries;
+	nx_float     	 ftsp_skew;
 } contourtracking_t;
 
 #endif

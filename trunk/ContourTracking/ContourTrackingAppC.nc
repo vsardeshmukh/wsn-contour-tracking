@@ -8,6 +8,9 @@
  * 94704.  Attention:  Intel License Inquiry.
  */
 
+#include "Timer.h"
+#include "ContourTracking.h"
+
 /**
  * ContourTracking demo application. Uses the demo sensor - change the
  * new DemoSensorC() instantiation if you want something else.
@@ -19,17 +22,50 @@
 configuration ContourTrackingAppC { }
 implementation
 {
-  components ContourTrackingC, MainC, ActiveMessageC, LedsC,
-    new TimerMilliC(), new DemoSensorC() as Sensor, 
-    new AMSenderC(AM_CONTOURTRACKING), new AMReceiverC(AM_CONTOURTRACKING);
+	components MainC, ActiveMessageC, LedsC, TimeSyncC;
+  components new TimerMilliC(), new DemoSensorC() as Sensor; 
+  components new AMSenderC(AM_CONTOURTRACKING), new AMReceiverC(AM_CONTOURTRACKING);
 
-  ContourTrackingC.Boot -> MainC;
-  ContourTrackingC.RadioControl -> ActiveMessageC;
-  ContourTrackingC.AMSend -> AMSenderC;
-  ContourTrackingC.Receive -> AMReceiverC;
-  ContourTrackingC.Timer -> TimerMilliC;
-  ContourTrackingC.Read -> Sensor;
-  ContourTrackingC.Leds -> LedsC;
+	MainC.SoftwareInit -> TimeSyncC;
+	TimeSyncC.Boot -> MainC;
 
-  
+  components ContourTrackingC as App;
+  App.Boot -> MainC;
+  App.Leds -> LedsC;
+  App.Read -> Sensor;
+  App.RadioControl -> ActiveMessageC;
+  App.AMSend -> AMSenderC;
+  App.Receive -> AMReceiverC;
+	App.Packet -> ActiveMessageC;
+	App.PacketTimeStamp -> ActiveMessageC;
+	App.GlobalTime -> TimeSyncC;
+	App.TimeSyncInfo -> TimeSyncC;
+  App.Timer -> TimerMilliC;
+
+	//components CounterMilli32C;
+	//components new CounterToLocalTimeC(TMilli) as LocalTimeMilli32C;
+	//LocalTimeMilli32C.Counter -> CounterMilli32C;
+
+/*
+	components MainC, TimeSyncC;
+
+	MainC.SoftwareInit -> TimeSyncC;
+	TimeSyncC.Boot -> MainC;
+
+	components TestFtspC as App;
+	App.Boot -> MainC;
+
+	components ActiveMessageC;
+	App.RadioControl -> ActiveMessageC;
+	App.Receive -> ActiveMessageC.Receive[AM_RADIO_COUNT_MSG];
+	App.AMSend -> ActiveMessageC.AMSend[AM_TEST_FTSP_MSG];
+	App.Packet -> ActiveMessageC;
+	App.PacketTimeStamp -> ActiveMessageC;
+
+	components LedsC;
+
+	App.GlobalTime -> TimeSyncC;
+	App.TimeSyncInfo -> TimeSyncC;
+	App.Leds -> LedsC;
+*/
 }
