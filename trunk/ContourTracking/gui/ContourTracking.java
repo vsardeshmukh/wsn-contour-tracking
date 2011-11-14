@@ -102,11 +102,6 @@ public class ContourTracking extends TimerTask implements MessageListener
 				//System.out.println("mote[" + id + "] is bright.");
 				eventMotes.add(mote);
 			}
-
-			if(!data.getNodeSync(id)) {
-				System.out.println("mote[" + id + "] is not synchronized with FTSP.");
-				return false;
-			}
 		}
 
 		Vector blobs = new Vector();
