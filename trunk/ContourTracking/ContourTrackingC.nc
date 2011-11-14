@@ -63,8 +63,8 @@ implementation
     local.threshold = DEFAULT_THRESHOLD;
     local.id = TOS_NODE_ID;
     local.clock = 0;
-    if (call RadioControl.start() != SUCCESS)
-      report_problem();
+    if (call RadioControl.start() != SUCCESS) 
+      ;//report_problem();
   }
 
   void startTimer() {
