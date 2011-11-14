@@ -72,12 +72,16 @@ public class ContourTracking extends TimerTask implements MessageListener
 
 	private synchronized boolean track() {
 		int count = window.moteListModel.size();
-		if(count != 9 && count != 16)
+		long timestamp = data.getLastSamplingTimestamp();
+		if(timestamp < 0) {
+			System.out.println("No tracking since there are no valid sampling timestamp.");
 			return false;
+		}
+		//if(count != 9 && count != 16)
+		//	return false;
 
 		System.out.println("There are " + snapshots.size() + " snapshots done");
 		Vector prevSnapshot = snapshots.isEmpty() ? null : (Vector)snapshots.lastElement();
-		long timestamp = data.getLastSamplingTimestamp();
 		if(prevSnapshot != null) {
 			long ts = ((Long)prevSnapshot.firstElement()).longValue();
 			System.out.println("prev snapshot timestamp: " + ts + ", last sampling timestamp: " + timestamp);
@@ -128,10 +132,10 @@ public class ContourTracking extends TimerTask implements MessageListener
 			assert(blob != null);
 
 			// add event mote neighbors
-			final int DIM = (count == 9 ? 3 : 4);
-			int idx = mote[0] - 1;
+			final int DIM = (count <= 9 ? 3 : 4);
+			int idx = motes.indexOf(mote);
 			int[] join = null;
-			if(idx % DIM < DIM - 1) { // R neighbor
+			if(idx % DIM < DIM - 1 && idx < count - 1) { // R neighbor
 				int[] R = (int[])motes.get(idx+1);
 				if(eventMotes2.contains(R)){
 					blob.add(R);
@@ -140,23 +144,28 @@ public class ContourTracking extends TimerTask implements MessageListener
 					join = R;
 			}
 
-			if(idx < count - DIM) { // LU, U, RU neighbors
-				if(idx % DIM > 0) { // LU neighbor
-					int[] LU = (int[])motes.get(idx+DIM-1);
+			//if(idx < count - DIM) { // LU, U, RU neighbors
+				if(idx % DIM > 0 && idx + DIM <= count) { // LU neighbor
+					int[] LU = null;
+					if(idx < count)
+						LU = (int[])motes.get(idx+DIM-1);
 					if(eventMotes2.contains(LU)){
 						blob.add(LU);
 						eventMotes2.remove(LU);
 					} else if(!blobs.contains(blob) && eventMotes.contains(LU))
 						join = LU;
 				}
-				int[] U = (int[])motes.get(idx+DIM); // U neighbor
-				if(eventMotes2.contains(U)) {
-					blob.add(U);
-					eventMotes2.remove(U);
-				} else if(!blobs.contains(blob) && eventMotes.contains(U))
-					join = U;
-				
-				if(idx % DIM < DIM - 1) { // RU neighbor
+
+				if(idx + DIM < count) {
+					int[] U = (int[])motes.get(idx+DIM); // U neighbor
+					if(eventMotes2.contains(U)) {
+						blob.add(U);
+						eventMotes2.remove(U);
+					} else if(!blobs.contains(blob) && eventMotes.contains(U))
+						join = U;
+				}
+
+				if(idx % DIM < DIM - 1 && idx + DIM + 1 < count) { // RU neighbor
 					int[] RU = (int[])motes.get(idx+DIM+1);
 					if(eventMotes2.contains(RU)) {
 						blob.add(RU);
@@ -164,7 +173,7 @@ public class ContourTracking extends TimerTask implements MessageListener
 					} else if(!blobs.contains(blob) && eventMotes.contains(RU))
 						join = RU;
 				}
-			}
+			//}
 
 			if(join != null) {
 				for(Iterator iterator = blobs.iterator(); iterator.hasNext();) {
@@ -175,6 +184,9 @@ public class ContourTracking extends TimerTask implements MessageListener
 			} else if(!blobs.contains(blob))
 				blobs.add(blob);
 		}
+
+		if(blobs.isEmpty())
+			return false;
 
 		Vector snapshot = new Vector();
 		snapshot.add(new Long(timestamp));
