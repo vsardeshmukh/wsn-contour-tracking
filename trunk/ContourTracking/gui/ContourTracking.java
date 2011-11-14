@@ -50,9 +50,14 @@ public class ContourTracking extends TimerTask implements MessageListener
 	int threshold = Constants.DEFAULT_THRESHOLD;
 	int version = -1;
 
+	/* event tracking info - Farley */
+	private boolean lightEventMode = true;
+	private Vector snapshots = new Vector();
+
 	/* TimerTask: update motes clock periodically */
 	public void run() {
 		sendBeacon();
+		track();
 	}
 
 	/* Main entry point */
@@ -65,24 +70,167 @@ public class ContourTracking extends TimerTask implements MessageListener
 		new Timer().schedule(this, 0, 1000);
 	}
 
+	private synchronized boolean track() {
+		int count = window.moteListModel.size();
+		if(count != 9 && count != 16)
+			return false;
+
+		System.out.println("There are " + snapshots.size() + " snapshots done");
+		Vector prevSnapshot = snapshots.isEmpty() ? null : (Vector)snapshots.lastElement();
+		long timestamp = data.getLastSamplingTimestamp();
+		if(prevSnapshot != null) {
+			long ts = ((Long)prevSnapshot.firstElement()).longValue();
+			System.out.println("prev snapshot timestamp: " + ts + ", last sampling timestamp: " + timestamp);
+			if(ts == timestamp) {
+				System.out.println("Last sampling timestamp has not been updated.");
+				return false;
+			}
+		}
+
+		int mode = lightEventMode ? 1 : 0;
+		Vector motes = new Vector();
+		Vector eventMotes = new Vector();
+		for (int i = 0; i < count; i++) {
+			int id = window.moteListModel.get(i);
+			int sample = data.getData(id, data.maxX(id));
+			int mote[] = new int[3];
+			mote[0] = id;
+			mote[1] = sample;
+			mote[2] = (sample >= threshold ? 1 : 0);
+			motes.add(mote);
+			if(mote[2] == mode) {
+				//System.out.println("mote[" + id + "] is bright.");
+				eventMotes.add(mote);
+			}
+
+			if(!data.getNodeSync(id)) {
+				System.out.println("mote[" + id + "] is not synchronized with FTSP.");
+				return false;
+			}
+		}
+
+		Vector blobs = new Vector();
+		Vector eventMotes2 = new Vector(eventMotes);
+		for(Iterator itr = eventMotes.iterator(); itr.hasNext();) {
+			int[] mote = (int[])itr.next();
+			Vector blob = null;
+			System.out.println("mote[" + mote[0] + "] is event mote");
+			if(eventMotes2.contains(mote)) { // not contained yet
+				blob = new Vector();
+				blob.add(mote);
+				eventMotes2.remove(mote);
+				//System.out.println("new blob with mote[" + mote[0] + "]");
+			} else {
+				for(Iterator iter = blobs.iterator(); iter.hasNext();) {
+					blob = (Vector)iter.next();
+					if(blob.contains(mote)) {
+						//System.out.println("existing blob with mote[" + mote[0] + "]");
+						break;
+					} else
+						blob = null;
+				}
+			}
+			assert(blob != null);
+
+			// add event mote neighbors
+			final int DIM = (count == 9 ? 3 : 4);
+			int idx = mote[0] - 1;
+			int[] join = null;
+			if(idx % DIM < DIM - 1) { // R neighbor
+				int[] R = (int[])motes.get(idx+1);
+				if(eventMotes2.contains(R)){
+					blob.add(R);
+					eventMotes2.remove(R);
+				} else if(!blobs.contains(blob) && eventMotes.contains(R))
+					join = R;
+			}
+
+			if(idx < count - DIM) { // LU, U, RU neighbors
+				if(idx % DIM > 0) { // LU neighbor
+					int[] LU = (int[])motes.get(idx+DIM-1);
+					if(eventMotes2.contains(LU)){
+						blob.add(LU);
+						eventMotes2.remove(LU);
+					} else if(!blobs.contains(blob) && eventMotes.contains(LU))
+						join = LU;
+				}
+				int[] U = (int[])motes.get(idx+DIM); // U neighbor
+				if(eventMotes2.contains(U)) {
+					blob.add(U);
+					eventMotes2.remove(U);
+				} else if(!blobs.contains(blob) && eventMotes.contains(U))
+					join = U;
+				
+				if(idx % DIM < DIM - 1) { // RU neighbor
+					int[] RU = (int[])motes.get(idx+DIM+1);
+					if(eventMotes2.contains(RU)) {
+						blob.add(RU);
+						eventMotes2.remove(RU);
+					} else if(!blobs.contains(blob) && eventMotes.contains(RU))
+						join = RU;
+				}
+			}
+
+			if(join != null) {
+				for(Iterator iterator = blobs.iterator(); iterator.hasNext();) {
+					Vector b = (Vector)iterator.next();
+					if(b.contains(join))
+						b.addAll(blob);
+				}
+			} else if(!blobs.contains(blob))
+				blobs.add(blob);
+		}
+
+		Vector snapshot = new Vector();
+		snapshot.add(new Long(timestamp));
+		snapshot.add(blobs);
+		snapshots.add(snapshot);
+		if(snapshots.size() > 10)
+			snapshots.remove(snapshots.firstElement());
+
+		// debug bright or dark sets
+		debugSnapshot(snapshot);
+
+		// identify events between two snapshots
+		return true;
+	}
+
+	void debugSnapshot(Vector snapshot) {
+		int count = 1; 
+		long timestamp = ((Long)snapshot.firstElement()).longValue();
+		System.out.println("DEBUG: snapshot at " + timestamp);
+		Vector blobs = (Vector)snapshot.lastElement();
+		for(Iterator itr = blobs.iterator(); itr.hasNext(); count++) {
+			Vector blob = (Vector)itr.next();
+			System.out.print("blob " + count + ": {" );
+			for(Iterator iter = blob.iterator(); iter.hasNext();) {
+				int[] mote = (int[])iter.next();
+				System.out.print(mote[0]);
+				if(iter.hasNext())
+					System.out.print(", ");
+			}
+			System.out.println("}");
+		}
+	}
+
 	/* The data object has informed us that nodeId is a previously unknown
 	   mote. Update the GUI. */
 	void newNode(int nodeId) {
 		window.newNode(nodeId);
 	}
 
-	public synchronized void messageReceived(int dest_addr, 
-			Message msg) {
+	public synchronized void messageReceived(int dest_addr,	Message msg) {
 		if (msg instanceof ContourTrackingMsg) {
 			ContourTrackingMsg omsg = (ContourTrackingMsg)msg;
 
 			/* Update interval and mote data */
 			periodUpdate(omsg.get_version(), omsg.get_interval());
-			data.update(omsg.get_id(), omsg.get_count(), omsg.get_readings());
-			System.out.println("mote[" + omsg.get_id() + "] msg seq: " + omsg.get_count() + " with clock: " + omsg.get_clock() + ", local ts: " + omsg.get_ftsp_local_timestamp() + ", global ts: " + omsg.get_ftsp_global_timestamp() + ", root id: " + omsg.get_ftsp_root_id() + ", skew: " + omsg.get_ftsp_skew() + ", synced: " + omsg.get_ftsp_synced() + " at " + System.currentTimeMillis());
-
-			/* Inform the GUI that new data showed up */
-			window.newData();
+			if(omsg.get_ftsp_synced() > 0) {
+				data.update(omsg.get_id(), omsg.get_count(), omsg.get_readings(), omsg.get_ftsp_global_timestamp(), omsg.get_ftsp_synced() > 0);
+				window.newData();
+				//System.out.println("mote[" + omsg.get_id() + "] msg seq: " + omsg.get_count() + " with clock: " + omsg.get_clock() + ", local ts: " + omsg.get_ftsp_local_timestamp() + ", global ts: " + omsg.get_ftsp_global_timestamp() + ", root id: " + omsg.get_ftsp_root_id() + ", skew: " + omsg.get_ftsp_skew() + ", synced: " + omsg.get_ftsp_synced() + " at " + System.currentTimeMillis());
+				/* Inform the GUI that new data showed up */
+			}
 		}
 	}
 
@@ -129,7 +277,6 @@ public class ContourTracking extends TimerTask implements MessageListener
 	/* Broadcast a version+interval message. */
 	void sendBeacon() {
 		ContourTrackingMsg omsg = new ContourTrackingMsg();
-
 		omsg.set_version(version);
 		omsg.set_interval(interval);
 		omsg.set_threshold(threshold);
