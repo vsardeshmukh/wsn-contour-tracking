@@ -45,27 +45,4 @@ implementation
 	//components CounterMilli32C;
 	//components new CounterToLocalTimeC(TMilli) as LocalTimeMilli32C;
 	//LocalTimeMilli32C.Counter -> CounterMilli32C;
-
-/*
-	components MainC, TimeSyncC;
-
-	MainC.SoftwareInit -> TimeSyncC;
-	TimeSyncC.Boot -> MainC;
-
-	components TestFtspC as App;
-	App.Boot -> MainC;
-
-	components ActiveMessageC;
-	App.RadioControl -> ActiveMessageC;
-	App.Receive -> ActiveMessageC.Receive[AM_RADIO_COUNT_MSG];
-	App.AMSend -> ActiveMessageC.AMSend[AM_TEST_FTSP_MSG];
-	App.Packet -> ActiveMessageC;
-	App.PacketTimeStamp -> ActiveMessageC;
-
-	components LedsC;
-
-	App.GlobalTime -> TimeSyncC;
-	App.TimeSyncInfo -> TimeSyncC;
-	App.Leds -> LedsC;
-*/
 }
