@@ -29,6 +29,9 @@ class MoteGrid extends JPanel
 
 	final static int MIN_WIDTH = 50;
 
+	//Maximum sensor reading - Vivek
+	final static double MAXREAD = 1000.0 ;
+
 	int gx0, gx1, gy0, gy1; // graph bounds
 	int scale = 2; // gx1 - gx0 == MIN_WIDTH << scale
 	Window parent;
@@ -88,10 +91,12 @@ class MoteGrid extends JPanel
 			int centerY = getHeight() / 2;
 			int marginX = getWidth() / 10;
 			int marginY = getHeight() / 100 * 20;
-			int gridX = marginX;
+			int gridX = 2*marginX;
 			int gridY = marginY;
-			int gridWidth = getWidth() - 2 * marginX;
+			//int gridWidth = getWidth() - 2 * marginX;
 			int gridHeight = getHeight() - 2 * marginY;
+			/* Bluff to draw squares - Vivek*/
+			int gridWidth = gridHeight;
 			int offsetX = gridWidth / (DIM - 1);
 			int offsetY = gridHeight / (DIM - 1);
 			int radius = 15;
@@ -106,8 +111,14 @@ class MoteGrid extends JPanel
 			clipped.drawLine(gridX, gridY, gridX, gridY+gridHeight);
 			clipped.drawLine(gridX+gridWidth, gridY+gridHeight, gridX, gridY+gridHeight);
 			clipped.drawLine(gridX+gridWidth, gridY+gridHeight, gridX+gridWidth, gridY);
-			clipped.drawLine(gridX+gridWidth/2, gridY, gridX+gridWidth/2, gridY+gridHeight);
-			clipped.drawLine(gridX, gridY+gridHeight/2, gridX+gridWidth, gridY+gridHeight/2);
+			//clipped.drawLine(gridX+gridWidth/2, gridY, gridX+gridWidth/2, gridY+gridHeight);
+			//clipped.drawLine(gridX, gridY+gridHeight/2, gridX+gridWidth, gridY+gridHeight/2);
+			/* For 16 motes - Vivek*/
+			clipped.drawLine(gridX+gridWidth/3, gridY, gridX+gridWidth/3, gridY+gridHeight);
+			clipped.drawLine(gridX+(2*gridWidth/3), gridY, gridX+(2*gridWidth/3), gridY+gridHeight);
+			clipped.drawLine(gridX, gridY+gridHeight/3, gridX+gridWidth, gridY+gridHeight/3);
+			clipped.drawLine(gridX, gridY+(2*gridHeight/3), gridX+gridWidth, gridY+(2*gridHeight/3));
+			/* End - Vivek*/
 			clipped.setStroke(stroke);
 			for (int i = 0; i < (count > 16 ? 16 : count) ; i++) {
 				boolean same = true;
@@ -131,12 +142,26 @@ class MoteGrid extends JPanel
 				// BLACK = 0, WHITE = 1, GREY = 2
 				mote[3] = same ? mote[2] : 2;
 
-				// draw mote on the grid
 				int row = i / DIM;
 				int col = i % DIM;
 				int moteX = gridX + col * offsetX;
 				int moteY = gridY + gridHeight - row * offsetY;
-				if(mote[3] == 0) { // black
+		
+				// Draw circles for contour - Vivek
+				Ellipse2D.Double circle;
+				double circleR;
+				if(mote[2] == 1) {
+					circleR = ( MAXREAD - (parent.parent.threshold - mote[1] ) ) / (2*MAXREAD);
+					circleR = circleR * (gridHeight/3);  
+					clipped.setColor(new Color(153,153,255));
+					circle=new Ellipse2D.Double(moteX-circleR, moteY-circleR, 2*circleR, 2*circleR);
+					//System.out.println("R = "+ circleR);
+					clipped.fill(circle);
+				}
+				//End - Vivek
+
+				// draw mote on the grid
+						if(mote[3] == 0) { // black
 					clipped.setColor(Color.BLACK);
 					clipped.fillRect(moteX-radius, moteY-radius, 2*radius, 2*radius);
 					clipped.setColor(Color.WHITE);
