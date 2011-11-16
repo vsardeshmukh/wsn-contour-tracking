@@ -140,48 +140,50 @@ public class ContourTracking extends TimerTask implements MessageListener
 				if(eventMotes2.contains(R)){
 					blob.add(R);
 					eventMotes2.remove(R);
-				} else if(!blobs.contains(blob) && eventMotes.contains(R))
+				} else if((!blobs.contains(blob) || !blob.contains(R)) && eventMotes.contains(R) ) {
 					join = R;
+				}
 			}
 
-			//if(idx < count - DIM) { // LU, U, RU neighbors
-				if(idx % DIM > 0 && idx + DIM <= count) { // LU neighbor
-					int[] LU = null;
-					if(idx < count)
-						LU = (int[])motes.get(idx+DIM-1);
-					if(eventMotes2.contains(LU)){
-						blob.add(LU);
-						eventMotes2.remove(LU);
-					} else if(!blobs.contains(blob) && eventMotes.contains(LU))
-						join = LU;
-				}
+			if(idx % DIM > 0 && idx + DIM <= count) { // LU neighbor
+				int[] LU = (int[])motes.get(idx+DIM-1);
+				if(eventMotes2.contains(LU)){
+					blob.add(LU);
+					eventMotes2.remove(LU);
+				} else if((!blobs.contains(blob) || !blob.contains(LU)) && eventMotes.contains(LU))
+					join = LU;
+			}
 
-				if(idx + DIM < count) {
-					int[] U = (int[])motes.get(idx+DIM); // U neighbor
-					if(eventMotes2.contains(U)) {
-						blob.add(U);
-						eventMotes2.remove(U);
-					} else if(!blobs.contains(blob) && eventMotes.contains(U))
-						join = U;
-				}
+			if(idx + DIM < count) {
+				int[] U = (int[])motes.get(idx+DIM); // U neighbor
+				if(eventMotes2.contains(U)) {
+					blob.add(U);
+					eventMotes2.remove(U);
+				} else if((!blobs.contains(blob) || !blob.contains(U)) && eventMotes.contains(U))
+					join = U;
+			}
 
-				if(idx % DIM < DIM - 1 && idx + DIM + 1 < count) { // RU neighbor
-					int[] RU = (int[])motes.get(idx+DIM+1);
-					if(eventMotes2.contains(RU)) {
-						blob.add(RU);
-						eventMotes2.remove(RU);
-					} else if(!blobs.contains(blob) && eventMotes.contains(RU))
-						join = RU;
-				}
-			//}
+			if(idx % DIM < DIM - 1 && idx + DIM + 1 < count) { // RU neighbor
+				int[] RU = (int[])motes.get(idx+DIM+1);
+				if(eventMotes2.contains(RU)) {
+					blob.add(RU);
+					eventMotes2.remove(RU);
+				} else if((!blobs.contains(blob) || !blob.contains(RU)) && eventMotes.contains(RU))
+					join = RU;
+			}
 
 			if(join != null) {
 				for(Iterator iterator = blobs.iterator(); iterator.hasNext();) {
 					Vector b = (Vector)iterator.next();
-					if(b.contains(join))
-						b.addAll(blob);
+					if(b.contains(join)) {
+						blob.addAll(b);
+						iterator.remove();
+						break;
+					}
 				}
-			} else if(!blobs.contains(blob))
+			}
+			
+			if(!blobs.contains(blob))
 				blobs.add(blob);
 		}
 
