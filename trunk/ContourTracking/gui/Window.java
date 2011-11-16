@@ -172,7 +172,7 @@ class Window {
 
 		graph = new Graph(this);
 		grid = new MoteGrid(this);
-		Box charts = new Box(BoxLayout.Y_AXIS);
+		Box charts = new Box(BoxLayout.X_AXIS);
 		charts.add(grid);
 		charts.add(graph);
 		main.add(charts, BorderLayout.CENTER);
