@@ -20,6 +20,7 @@ class Window {
 	ContourTracking parent;
 	Graph graph;
 	MoteGrid grid;
+	Bulletin bulletin;
 
 	Font smallFont = new Font("Dialog", Font.PLAIN, 8);
 	Font boldFont = new Font("Dialog", Font.BOLD, 12);
@@ -152,6 +153,10 @@ class Window {
 		return tf;
 	}
 
+	public void showText(String text) {
+		bulletin.setText(text);
+	}
+
 	/* Build the GUI */
 	void setup() {
 		JPanel main = new JPanel(new BorderLayout());
@@ -163,8 +168,7 @@ class Window {
 		moteListModel = new  MoteTableModel();
 		JTable moteList = new JTable(moteListModel);
 		moteList.setDefaultRenderer(Color.class, new MoteColor());
-		moteList.setDefaultEditor(Color.class, 
-				new ColorCellEditor("Pick Mote Color"));
+		moteList.setDefaultEditor(Color.class, new ColorCellEditor("Pick Mote Color"));
 		moteList.setPreferredScrollableViewportSize(new Dimension(100, 400));
 		JScrollPane motePanel = new JScrollPane();
 		motePanel.getViewport().add(moteList, null);
@@ -172,8 +176,12 @@ class Window {
 
 		graph = new Graph(this);
 		grid = new MoteGrid(this);
+		bulletin = new Bulletin();
+		Box info = new Box(BoxLayout.Y_AXIS);
+		info.add(bulletin);
+		info.add(grid);
 		Box charts = new Box(BoxLayout.X_AXIS);
-		charts.add(grid);
+		charts.add(info);
 		charts.add(graph);
 		main.add(charts, BorderLayout.CENTER);
 
