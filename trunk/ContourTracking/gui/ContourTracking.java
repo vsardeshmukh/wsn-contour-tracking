@@ -80,11 +80,11 @@ public class ContourTracking extends TimerTask implements MessageListener
 		//if(count != 9 && count != 16)
 		//	return false;
 
-		System.out.println("There are " + snapshots.size() + " snapshots done");
+		//System.out.println("There are " + snapshots.size() + " snapshots done");
 		Vector prevSnapshot = snapshots.isEmpty() ? null : (Vector)snapshots.lastElement();
 		if(prevSnapshot != null) {
 			long ts = ((Long)prevSnapshot.firstElement()).longValue();
-			System.out.println("prev snapshot timestamp: " + ts + ", last sampling timestamp: " + timestamp);
+			//System.out.println("prev snapshot timestamp: " + ts + ", last sampling timestamp: " + timestamp);
 			if(ts == timestamp) {
 				System.out.println("Last sampling timestamp has not been updated.");
 				return false;
@@ -202,6 +202,43 @@ public class ContourTracking extends TimerTask implements MessageListener
 
 		// identify events between two snapshots
 		return true;
+	}
+	/*function to analyze changes in topology, prints to Terminal - Bob */
+	void analyzeSnapshots(Vector snapshots){
+		int count = 1; 
+		Vector snapshot2 = (Vector)snapshots.lastElement();
+		Vector snapshot1 = (Vector)snapshots.get(snapshots.size()-2);
+		Vector blobs1 = (Vector)snapshot1.lastElement(); 
+		Vector blobs2 = (Vector)snapshot2.lastElement();
+		boolean inSystem = false;
+		
+		
+		while(blobs1.hasNext())
+		{
+			Vector blob1 = (Vector)blobs1.next();
+			while(blob1.hasNext())
+			{
+				int[] mote = (int[])blob1.next();
+				blobs2 = (Vector)snapshot2.lastElement();
+				while(blobs2.hasNext())
+				{
+					Vector blob2 = (Vector)blobs2.next();
+					if(blob2.contains(mote))
+					{
+						//Mote has not been dropped but may have moved
+						inSystem=true;
+					}
+				}
+				if(!inSystem)
+				{
+					//Mote has been dropped completeley
+				}
+				inSystem = false;
+			}
+		}
+
+		
+		
 	}
 
 	void debugSnapshot(Vector snapshot) {
