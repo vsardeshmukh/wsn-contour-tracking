@@ -110,7 +110,7 @@ public class ContourTracking extends TimerTask implements MessageListener
 				eventMotes.add(mote);
 			}
 		}
-
+		
 		Vector blobs = new Vector();
 		Vector eventMotes2 = new Vector(eventMotes);
 		for(Iterator itr = eventMotes.iterator(); itr.hasNext();) {
@@ -192,7 +192,7 @@ public class ContourTracking extends TimerTask implements MessageListener
 
 		if(blobs.isEmpty())
 			return false;
-
+		
 		Vector snapshot = new Vector();
 		snapshot.add(new Long(timestamp));
 		snapshot.add(blobs);
@@ -209,6 +209,16 @@ public class ContourTracking extends TimerTask implements MessageListener
 			snapshots.add(snapshot);
 			System.out.println("Snapshot not changed");
 		}
+
+/* Bob's experimental code
+		snapshots.add(snapshot);
+		if(snapshots.size() > 10)
+			snapshots.remove(snapshots.firstElement());
+
+		// debug bright or dark sets
+		analyzeSnapshots(snapshots);
+		//debugSnapshot(snapshot);
+*/
 
 		return true;
 	}
@@ -493,32 +503,52 @@ System.out.println("line: " + line);
 		Vector snapshot1 = (Vector)snapshots.get(snapshots.size()-2);
 		Vector blobs1 = (Vector)snapshot1.lastElement(); 
 		Vector blobs2 = (Vector)snapshot2.lastElement();
-		boolean inSystem = false;
+		boolean eventFound = false;
+		boolean sameBlob = false;
+		String events = "";
+		Iterator iter2;
 		
 		
-		while(blobs1.hasNext())
-		{
-			Vector blob1 = (Vector)blobs1.next();
-			while(blob1.hasNext())
-			{
-				int[] mote = (int[])blob1.next();
-				blobs2 = (Vector)snapshot2.lastElement();
-				while(blobs2.hasNext())
-				{
-					Vector blob2 = (Vector)blobs2.next();
-					if(blob2.contains(mote))
-					{
-						//Mote has not been dropped but may have moved
-						inSystem=true;
+		//move
+		for(Iterator itr1 = blobs1.iterator(); itr1.hasNext(); count++) {
+			Vector blob1 = (Vector)itr1.next();
+			for (Iterator itr2 = blobs2.iterator(); itr2.hasNext(); count++){
+				Vector blob2 = (Vector)itr2.next();
+				if (blob2.size() == blob1.size()){
+					iter2 = blob2.iterator();
+					for(Iterator iter1 = blob1.iterator(); iter1.hasNext(); count++){
+						int[] mote1 = (int[])iter1.next();
+						int[] mote2 = (int[])iter2.next();
+						if(mote1[0]!=mote2[0]){
+							eventFound = true;
+						}
 					}
 				}
-				if(!inSystem)
-				{
-					//Mote has been dropped completeley
-				}
-				inSystem = false;
 			}
+			
 		}
+		if(eventFound){
+			//events += "move ";
+			System.out.println("move");
+		}
+		System.out.println(eventFound);
+		eventFound = false;
+		//expand
+
+		
+
+
+		//shrink
+
+
+
+
+		//merge
+
+
+
+
+		//split
 
 		
 		
