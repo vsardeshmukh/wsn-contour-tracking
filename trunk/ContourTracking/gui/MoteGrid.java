@@ -58,6 +58,7 @@ class MoteGrid extends JPanel
 	}
 
 	MoteGrid(Window parent) {
+		setPreferredSize(new Dimension(0, 800));
 		this.parent = parent;
 		gx0 = 0; gx1 = MIN_WIDTH << scale;
 	}
