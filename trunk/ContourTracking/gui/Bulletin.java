@@ -14,7 +14,7 @@ class Bulletin extends JPanel {
 
 	private void setup() {
 		field.setForeground(Color.WHITE);
-		field.setFont(new Font("Georgia", Font.BOLD, 48));
+		field.setFont(new Font("Georgia", Font.BOLD, 36));
 		field.setAlignmentX(CENTER_ALIGNMENT);
 		setBackground(Color.BLACK);
 		add(field);
