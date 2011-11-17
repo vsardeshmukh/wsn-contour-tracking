@@ -12,6 +12,9 @@ import net.tinyos.message.*;
 import net.tinyos.util.*;
 import java.io.*;
 import java.util.*;
+import java.lang.Math;
+import java.awt.geom.Point2D;
+import java.text.DecimalFormat;
 
 /* The "ContourTracking" demo app. Displays graphs showing data received from
    the ContourTracking mote application, and allows the user to:
@@ -113,7 +116,7 @@ public class ContourTracking extends TimerTask implements MessageListener
 		for(Iterator itr = eventMotes.iterator(); itr.hasNext();) {
 			int[] mote = (int[])itr.next();
 			Vector blob = null;
-			System.out.println("mote[" + mote[0] + "] is event mote");
+			//System.out.println("mote[" + mote[0] + "] is event mote");
 			if(eventMotes2.contains(mote)) { // not contained yet
 				blob = new Vector();
 				blob.add(mote);
@@ -193,17 +196,297 @@ public class ContourTracking extends TimerTask implements MessageListener
 		Vector snapshot = new Vector();
 		snapshot.add(new Long(timestamp));
 		snapshot.add(blobs);
-		snapshots.add(snapshot);
-		if(snapshots.size() > 10)
-			snapshots.remove(snapshots.firstElement());
+		//debugSnapshot(snapshot);
 
-		// debug bright or dark sets
-		debugSnapshot(snapshot);
+		if(isSnapshotChanged(snapshot)) {
+			detect(snapshot);
+			snapshots.add(snapshot);
+			if(snapshots.size() > 10)
+				snapshots.remove(snapshots.firstElement());
+			System.out.println("Snapshot changed");
+		} else { // update timestamp only
+			snapshots.remove(snapshots.lastElement());
+			snapshots.add(snapshot);
+			System.out.println("Snapshot not changed");
+		}
 
-		// identify events between two snapshots
 		return true;
 	}
-	/*function to analyze changes in topology, prints to Terminal - Bob */
+
+	private int getGridDimension() {
+		return window.moteListModel.size() <= 9 ? 3 : 4;
+	}
+
+	private int computeBlobIntersectionCount(Vector blob1, Vector blob2) {
+		if(blob1 == null || blob1.isEmpty() | blob2 == null || blob2.isEmpty())
+			return 0;
+
+		int count = 0;
+		for(Iterator itr = blob1.iterator(); itr.hasNext();) {
+			int[] mote1 = (int[])itr.next();
+			for(Iterator iter = blob2.iterator(); iter.hasNext();) {
+				int[] mote2 = (int[])iter.next();
+				count += (mote1[0] == mote2[0] ? 1 : 0);
+			}
+		}
+		return count;
+	}
+
+	private boolean isBlobNeighboring(Vector blob1, Vector blob2) {
+		if(blob1 == null || blob1.isEmpty() | blob2 == null || blob2.isEmpty())
+			return false;
+
+		if(computeBlobIntersectionCount(blob1, blob2) > 0)
+			return false;
+
+		final int DIM = getGridDimension();
+		boolean grid[][] = new boolean[DIM][DIM];
+		for(Iterator itr = blob1.iterator(); itr.hasNext();) {
+			int[] mote = (int[])itr.next();
+			int idx = mote[0] - 1;
+			grid[idx / DIM][idx % DIM] = true;
+		}
+
+		for(Iterator itr = blob2.iterator(); itr.hasNext();) {
+			int[] mote = (int[])itr.next();
+			int idx = mote[0] - 1;
+			int row = idx / DIM;
+			int col = idx % DIM;
+			if(row + 1 < DIM) {
+				if(col - 1 >= 0 && grid[row+1][col-1]) // LU
+						return true;
+				if(grid[row+1][col]) // U
+						return true;
+				if(col + 1 < DIM && grid[row+1][col+1]) // RU
+						return true;
+			}
+
+			if(col - 1 >= 0 && grid[row][col-1]) // L
+				return true;
+
+			if(col + 1 < DIM && grid[row][col+1]) // R
+				return true;
+
+			if(row - 1 >= 0) {
+				if(col - 1 >= 0 && grid[row-1][col-1]) // LB
+						return true;
+				if(grid[row-1][col]) // B
+						return true;
+				if(col + 1 < DIM && grid[row-1][col+1]) // RB
+						return true;
+			}	
+		}
+		return false;
+	}
+
+	private Point2D computeBlobCenter(Vector blob) {
+		if(blob == null || blob.isEmpty())
+			return null;
+
+		double x = 0, y = 0;
+		final int DIM = getGridDimension();
+		for(Iterator itr = blob.iterator(); itr.hasNext();) {
+			int[] mote = (int[])itr.next();
+			int idx = mote[0] - 1;
+			x += idx % DIM;
+			y += idx / DIM;
+		}
+
+		return new Point2D.Double(x / blob.size(), y / blob.size());
+	}
+
+	private boolean isSnapshotChanged(Vector snapshot) {
+		if(snapshot == null)
+			return false;
+
+		long timestamp2 = ((Long)snapshot.firstElement()).longValue();
+		Vector blobs2 = (Vector)snapshot.lastElement();
+		if(blobs2 == null || blobs2.isEmpty())
+			return false;
+
+		if(snapshots.isEmpty())
+			return true;
+
+		Vector prevSnapshot = (Vector)snapshots.lastElement();
+		Vector blobs1 = (Vector)prevSnapshot.lastElement();
+		long timestamp1 = ((Long)prevSnapshot.firstElement()).longValue();
+
+		if(timestamp1 == timestamp2)
+			return false;
+
+		int count1 = 0, count2= 0;
+		final int DIM = getGridDimension();
+		System.out.println("DIM: " + DIM);
+		boolean grid[][] = new boolean[DIM][DIM];
+		//boolean grid[][] = new boolean[4][4];
+		for(Iterator itr = blobs1.iterator(); itr.hasNext();) {
+			Vector blob = (Vector)itr.next();
+			for(Iterator iter = blob.iterator(); iter.hasNext();) {
+				count1++;
+				int[] mote = (int[])iter.next();
+				int idx = mote[0] - 1;
+				grid[idx / DIM][idx % DIM] = true;
+			}
+		}
+
+		for(Iterator itr = blobs2.iterator(); itr.hasNext();) {
+			Vector blob = (Vector)itr.next();
+			for(Iterator iter = blob.iterator(); iter.hasNext();) {
+				count2++;
+				int[] mote = (int[])iter.next();
+				int idx = mote[0] - 1;
+				if(!grid[idx / DIM][idx % DIM])
+					return true;
+			}
+		}
+
+		return count1 != count2;
+	}
+
+	private int sizeOfBlobs(Vector blobs) {
+		int size = 0;
+		for(Iterator itr = blobs.iterator(); itr.hasNext();) {
+			Vector blob = (Vector)itr.next();
+			size += blob.size();
+		}
+		return size;
+	}
+	
+	// function two print 2 decimal float
+	double roundTwoDecimals(double d) {
+		DecimalFormat twoDForm = new DecimalFormat("#.##");
+		return Double.valueOf(twoDForm.format(d));
+	}
+	//end
+	
+	private void detect(Vector snapshot) {
+		if(snapshot == null || snapshot.lastElement() == null)
+			return;
+
+		long timestamp = ((Long)snapshot.firstElement()).longValue();
+		Vector blobs2 = (Vector)snapshot.lastElement();
+		if(blobs2.isEmpty())
+			return;
+
+		if(snapshots.isEmpty()) {
+			window.showText("Blob(s) Formed");
+			return;
+		}
+		
+		System.out.println("break 1");
+		Vector prevSnapshot = (Vector)snapshots.lastElement();
+		Vector blobs1 = (Vector)prevSnapshot.lastElement();
+		boolean MOVE = false, MERGE = false, SPLIT = false, EXPAND = false, SHRINK = false;
+		Point2D from, to;
+		String line = "";
+
+		// MOVE: neighboring or intersect with only one blob of the same size
+		for(Iterator itr = blobs2.iterator(); !MOVE && itr.hasNext();) {
+			Vector blob2 = (Vector)itr.next();
+			int intersections = 0;
+			double dirX = 0;
+			double dirY = 0;
+			for(Iterator iter = blobs1.iterator(); !MOVE && iter.hasNext();) {
+				Vector blob1 = (Vector)iter.next();
+				if(isBlobNeighboring(blob1, blob2) || computeBlobIntersectionCount(blob1, blob2) > 0) {
+					if(blob1.size() == blob2.size()) {
+						intersections++;
+						from = computeBlobCenter(blob1);
+						to = computeBlobCenter(blob2);
+						System.out.println("from(" + from.getX() + ", " + from.getY() + "), to(" + to.getX() + ", " + to.getY() + ")");
+						dirX = roundTwoDecimals( to.getX() - from.getX() );
+						dirY = roundTwoDecimals ( to.getY() - from.getY() );
+					}
+				}
+			}
+			if(intersections == 1) {
+				MOVE = true;
+				if(dirX>0) {
+					if(dirY>0)
+						line = "MOVED in NE";
+					else if(dirY<0)
+						line = "MOVED in SE";
+					else
+						line = "MOVED in E";
+				}
+				else if(dirX<0) {
+					if(dirY>0)
+						line = "MOVED in NW";
+					else if(dirY<0)
+						line = "MOVED in SW";
+					else
+						line = "MOVED in W";
+				}
+				else {
+					if(dirY>0)
+						line = "MOVED in N";
+					else if(dirY<0)
+						line = "MOVED in S";
+					else
+						line = "No Move";
+				}
+				//line = "MOVE(" + dirX + ", " + dirY + ")";
+			}
+		}
+System.out.println("break 2");
+		
+		// MERGE: intersect with two or more, last --> prev
+		int intersections = 0;
+		for(Iterator itr = blobs2.iterator(); intersections < 2 && itr.hasNext(); intersections = 0) {
+			Vector blob2 = (Vector)itr.next();
+			for(Iterator iter = blobs1.iterator(); iter.hasNext();) {
+				Vector blob1 = (Vector)iter.next();
+				if(computeBlobIntersectionCount(blob1, blob2) > 0)
+						intersections++;
+			}
+			if(intersections > 1) {
+				MERGE = true;
+				line += line.length() > 0 ? ", MERGE" : "MERGE";
+			}
+		}
+System.out.println("break 3");
+		
+		// SPLIT: intersect with two or more, prev --> last
+		intersections = 0;
+		for(Iterator itr = blobs1.iterator(); intersections < 2 && itr.hasNext(); intersections = 0) {
+			Vector blob1 = (Vector)itr.next();
+			for(Iterator iter = blobs2.iterator(); iter.hasNext();) {
+				Vector blob2 = (Vector)iter.next();
+				if(computeBlobIntersectionCount(blob2, blob1) > 0)
+						intersections++;
+			}
+			if(intersections > 1) {
+				SPLIT = true;
+				line += line.length() > 0 ? ", SPLIT" : "SPLIT";
+			}
+		}
+
+System.out.println("break 4");
+		// EXPAND: total number of bright motes increases
+		// SHRINK: total number of bright motes decreases
+		int sizeOfBlobs1 = sizeOfBlobs(blobs1);
+System.out.println("break 4.1");
+		int sizeOfBlobs2 = sizeOfBlobs(blobs2);
+		if(sizeOfBlobs1 < sizeOfBlobs2) {
+			EXPAND = true;
+			line += line.length() > 0 ? ", EXPAND" : "EXPAND";
+		} else if(sizeOfBlobs1 > sizeOfBlobs2) {
+			SHRINK = true;
+			line += line.length() > 0 ? ", SHRINK" : "SHRINK";
+		}
+
+		if(blobs1.size() < blobs2.size())
+			line += line.length() > 0 ? ", FORM" : "BLOB FORM";
+		else if(blobs1.size() > blobs2.size())
+			line += line.length() > 0 ? ", VANISH" : "BLOB VANISH";
+
+System.out.println("#blobs1: " + blobs1.size() + ", #blobs2: " + blobs2.size() + ", sizeOfBlobs1: " + sizeOfBlobs1 + ", sizeOfBlobs2: " + sizeOfBlobs2);
+		line += line.length() > 0 ? ", " + timestamp : "No New Event; " + timestamp ;
+		window.showText(line);
+System.out.println("line: " + line);
+	}
+
+	/*function to analyze changes in topology, prints to Terminal - Bob 
 	void analyzeSnapshots(Vector snapshots){
 		int count = 1; 
 		Vector snapshot2 = (Vector)snapshots.lastElement();
@@ -239,7 +522,7 @@ public class ContourTracking extends TimerTask implements MessageListener
 
 		
 		
-	}
+	}*/
 
 	void debugSnapshot(Vector snapshot) {
 		int count = 1; 
