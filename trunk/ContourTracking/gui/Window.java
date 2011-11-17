@@ -184,6 +184,7 @@ class Window {
 		charts.add(info);
 		charts.add(graph);
 		main.add(charts, BorderLayout.CENTER);
+		showText("No Event");
 
 		// Controls. Organised using box layouts.
 
