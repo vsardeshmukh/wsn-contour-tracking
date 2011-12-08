@@ -56,6 +56,10 @@ class Data {
 		return nodes[nodeId].getLastSamplingTimestamp() - nodes[nodeId].getDataOffsetToLastSample(x) * parent.interval;
 	}
 
+	long getLastSampleTimestamp(int nodeId) {
+		return nodes[nodeId] == null ? -1 : nodes[nodeId].getLastSamplingTimestamp();
+	}
+
 	long getLastSamplingTimestamp() {
 		long timestamp = -1;
 		for (int i = 0; i < nodes.length; i++) {
