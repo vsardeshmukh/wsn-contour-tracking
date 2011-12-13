@@ -33,6 +33,48 @@ public class EventContourTrackingPlayer implements ActionListener, ChangeListene
 			fPlayer = player;
 		}
 
+		void addControlPoints(ContourTracking.Blob blob, int row, int col, ContourSpline spline) {
+			ContourTracking.Snapshot snapshot = fPlayer.getPlayingSnapshot();
+			if(snapshot == null || spline == null)
+				return;
+
+			int DIM = snapshot.getGridDimension();
+			int idx = row * DIM +  col;
+			int id = snapshot.getMoteId(idx);
+
+			int marginX = getWidth() / 5;
+			int marginY = getHeight() / 100 * 20;
+			int gridX = marginX;
+			int gridY = marginY;
+			int gridWidth = getWidth() - 2 * marginX;
+			int gridHeight = getHeight() - 2 * marginY;
+			int offsetX = gridWidth / (DIM - 1);
+			int offsetY = gridHeight / (DIM - 1);
+			int moteX = gridX + col * offsetX;
+			int moteY = gridY + gridHeight - row * offsetY;
+
+			int nbrL = snapshot.getMoteNeighborId(id, ContourTracking.Position.L);
+			int nbrR = snapshot.getMoteNeighborId(id, ContourTracking.Position.R);
+			int nbrU = snapshot.getMoteNeighborId(id, ContourTracking.Position.U);
+			int nbrB = snapshot.getMoteNeighborId(id, ContourTracking.Position.B);
+			if(nbrL < 0 || !blob.contains(nbrL)) {
+				spline.addPoint(moteX - offsetX / 4, moteY);
+			}
+
+			if(nbrR < 0 || !blob.contains(nbrR)) {
+				spline.addPoint(moteX + offsetX / 4, moteY);
+			} 
+			
+			if(nbrU < 0 || !blob.contains(nbrU)) {
+				spline.addPoint(moteX, moteY - offsetY / 3);
+			}
+			
+			if(nbrB < 0 || !blob.contains(nbrB)) {
+				spline.addPoint(moteX, moteY + offsetY / 3);
+			}
+			
+		}
+
 		protected void paintComponent(Graphics g) {
 			ContourTracking.Snapshot snapshot = fPlayer.getPlayingSnapshot();
 			if(snapshot == null)
@@ -54,8 +96,6 @@ public class EventContourTrackingPlayer implements ActionListener, ChangeListene
 			int gridY = marginY;
 			int gridWidth = getWidth() - 2 * marginX;
 			int gridHeight = getHeight() - 2 * marginY;
-
-			/* Bluff to draw squares - Vivek*/
 			int offsetX = gridWidth / (DIM - 1);
 			int offsetY = gridHeight / (DIM - 1);
 			int radius = 15;
@@ -75,8 +115,6 @@ public class EventContourTrackingPlayer implements ActionListener, ChangeListene
 			}
 			g2d.setStroke(stroke);
 
-
-			//for (int i = 0; i < (count > 16 ? 16 : count) ; i++) {
 			for(Map.Entry<Integer, ContourTracking.Mote> entry: snapshot.entrySet()) {
 				boolean same = true;
 				int id = entry.getKey().intValue();
@@ -101,23 +139,7 @@ public class EventContourTrackingPlayer implements ActionListener, ChangeListene
 				int col = idx % DIM;
 				int moteX = gridX + col * offsetX;
 				int moteY = gridY + gridHeight - row * offsetY;
-
 				//System.out.printf("mote[%d] idx: %d, sample: %d, color: %s\n", id, idx, mote.getSample(), mote.getColor());
-		
-				// Draw circles for contour - Vivek
-				/*
-				Ellipse2D.Double circle;
-				double circleR;
-				if(mote[2] == 1) {
-					circleR = ( MAXREAD - (parent.parent.threshold - mote[1] ) ) / (2*MAXREAD);
-					circleR = circleR * (gridHeight/3);  
-					clipped.setColor(new Color(153,153,255));
-					circle=new Ellipse2D.Double(moteX-circleR, moteY-circleR, 2*circleR, 2*circleR);
-					//System.out.println("R = "+ circleR);
-					clipped.fill(circle);
-				}
-				*/
-				//End - Vivek
 
 				// draw mote on the grid
 				if(mote.getColor() == Color.BLACK) { // black
@@ -133,6 +155,110 @@ public class EventContourTrackingPlayer implements ActionListener, ChangeListene
 					g2d.setColor(mote.getColor() == Color.WHITE ? Color.BLACK : Color.RED);
 					g2d.drawString(String.valueOf(id), moteX-3, moteY+4);
 				}
+			}
+
+			// draw contour splines for each blob
+			for(ContourTracking.Blob blob: fPlayingSnapshot.getBlobs()) {
+				// step1. find contour motes without neighbors in either directions
+				Set<Point> cPoints = new HashSet<Point>();
+				for(Integer moteId: blob.getMotes()) {
+					int idx = snapshot.getMoteIndex(moteId.intValue());
+					int x = idx % DIM; // col
+					int y = idx / DIM; // row
+					int moteX = gridX + x * offsetX;
+					int moteY = gridY + gridHeight - y * offsetY;
+
+					int nbrL = snapshot.getMoteNeighborId(moteId.intValue(), ContourTracking.Position.L);
+					int nbrR = snapshot.getMoteNeighborId(moteId.intValue(), ContourTracking.Position.R);
+					int nbrU = snapshot.getMoteNeighborId(moteId.intValue(), ContourTracking.Position.U);
+					int nbrB = snapshot.getMoteNeighborId(moteId.intValue(), ContourTracking.Position.B);
+					if(nbrL < 0 || !blob.contains(nbrL)) {
+						Point p = new Point(moteX - offsetX / 4, moteY);
+						cPoints.add(p);
+						System.out.printf("add control point (%d, %d)\n", (int)p.getX(), (int)p.getY());
+					}
+
+					if(nbrR < 0 || !blob.contains(nbrR)) {
+						Point p = new Point(moteX + offsetX / 4, moteY);
+						cPoints.add(p);
+						System.out.printf("add control point (%d, %d)\n", (int)p.getX(), (int)p.getY());
+					}
+
+					if(nbrU < 0 || !blob.contains(nbrU)) {
+						Point p = new Point(moteX, moteY - offsetY / 3);
+						cPoints.add(p);
+						System.out.printf("add control point (%d, %d)\n", (int)p.getX(), (int)p.getY());
+					}
+
+					if(nbrB < 0 || !blob.contains(nbrB)) {
+						Point p = new Point(moteX, moteY + offsetY / 3);
+						cPoints.add(p);
+						System.out.printf("add control point (%d, %d)\n", (int)p.getX(), (int)p.getY());
+					}
+				}
+
+				// step2. sort and cluster the contour motes according to their x and y coordinates
+				SortedMap<Integer, Vector<Point>> contourMotes = new TreeMap<Integer, Vector<Point>>();
+				for(Point cp: cPoints) {
+					int x = (int)cp.getX();
+					int y = (int)cp.getY();
+					Vector<Point> points = contourMotes.get(new Integer(x));
+					if(points == null) {
+						points = new Vector<Point>();
+						points.add(cp);
+						contourMotes.put(new Integer(x), points);
+					} else {
+						boolean inserted = false;
+						for(int i = 0; i < points.size(); i++) {
+							Point p = points.get(i);
+							if(y < (int)p.getY()) {
+								points.insertElementAt(cp, i);
+								inserted = true;
+								break;
+							}
+						}
+						if(!inserted) 
+							points.add(cp);
+					}
+				}
+
+				// step3. add control points for each contour motes
+				ContourSpline spline = new ContourSpline();
+				int refX = contourMotes.firstKey().intValue();
+				int refY = (int)contourMotes.get(new Integer(refX)).firstElement().getY();
+				spline.addPoint(refX, refY);
+				contourMotes.get(new Integer(refX)).removeElementAt(0);
+				//System.out.printf("add ref control point(%d, %d)\n", refX, refY);
+				for(Map.Entry<Integer, Vector<Point>> entry: contourMotes.entrySet()) {
+					Vector<Point> points = entry.getValue();
+					for(Iterator<Point> itr = points.iterator(); itr.hasNext();) {
+						Point p = itr.next();
+						if((int)p.getY() <= refY) {
+							int x = entry.getKey().intValue();
+							int y = (int)p.getY();
+							spline.addPoint(x, y);
+							//System.out.printf("add control point(%d, %d)\n", x, y);
+							itr.remove();
+						}
+					}
+				}
+
+				while(!contourMotes.isEmpty()) {
+					int x = contourMotes.lastKey().intValue();
+					Vector<Point> points = contourMotes.get(new Integer(x));
+					while(!points.isEmpty()) {
+						Point p = (x > refX) ? points.firstElement() : points.lastElement();
+						int y = (int)p.getY();
+						spline.addPoint(x, y);
+						//System.out.printf("add control point(%d, %d)\n", x, y);
+						points.remove(p);
+					}
+					contourMotes.remove(new Integer(x));
+				}
+
+				// step4. paint the spline
+				g2d.setColor(Color.RED);
+				spline.paint(g);
 			}
 		}
 	}
@@ -289,12 +415,11 @@ public class EventContourTrackingPlayer implements ActionListener, ChangeListene
 
 		setSlierChangeEnabled(true);
 		fGridGraph.repaint();
-		fBulletin.setText(fPlayingSnapshot.getEvent() == null? "No Event" : fPlayingSnapshot.getEvent().toString());
+		fBulletin.setText((fPlayingSnapshot.getEvent() == null? "No Event" : fPlayingSnapshot.getEvent().toString()) + ", " + fPlayingSnapshot.getLatestSampleTimestamp());
 		return true;
 	}
 
 	void play() {
-		stop();
 		scheduleNextFrame();
 	}
 
@@ -341,6 +466,7 @@ public class EventContourTrackingPlayer implements ActionListener, ChangeListene
 	public void stateChanged(ChangeEvent e) {
 		JSlider source = (JSlider)e.getSource();
 		if (!source.getValueIsAdjusting() && fSliderChangeEnabled) {
+			stop();
 			seek(source.getValue());
 			play();
 		}
