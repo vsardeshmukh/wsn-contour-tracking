@@ -1,3 +1,4 @@
+import java.util.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.Line2D;
@@ -232,15 +233,51 @@ class NatCubicClosed extends NatCubic{
 
 public class ContourSpline {
 	NatCubicClosed fSpline;
+	Vector<Point> fPoints;
+
 	public ContourSpline() {
 		fSpline = new NatCubicClosed();
+		fPoints = new Vector<Point>();
 	}
 
-	public int addPoint(int x, int y) {
-		return fSpline.addPoint(x, y);
+	public void addPoint(int x, int y) {
+		fPoints.add(new Point(x, y));
+		//return fSpline.addPoint(x, y);
+	}
+
+	public void sort() {
+		if(fPoints.isEmpty())
+			return;
+
+		int count = fPoints.size();
+		int sumX = 0, sumY = 0;
+		for(Point p: fPoints) {
+			sumX += p.getX();
+			sumY += p.getY();
+		}
+		int centerX = sumX / count + -7;
+		int centerY = sumY / count + 9;
+
+		Map<Double, Point> sortedPoints = new TreeMap<Double, Point>();
+		for(Point p: fPoints) {
+			double atan = Math.atan2(p.getX() - centerX, p.getY() - centerY);
+			//double atan = Math.atan2(p.getY() - centerY, p.getX() - centerX);
+			if(sortedPoints.get(new Double(atan)) != null)
+				System.out.println("two points of the same atan!!!");
+			sortedPoints.put(new Double(atan), p);
+		}
+
+		//System.out.printf("unsorted points count: %d, sorted points count: %d\n", fPoints.size(), sortedPoints.size());
+		fPoints.clear();
+		for(Map.Entry<Double, Point> entry: sortedPoints.entrySet()) {
+			fPoints.add(entry.getValue());
+		}
 	}
 
 	public void paint(Graphics g) {
+		sort();
+		for(Point p: fPoints)
+			fSpline.addPoint((int)p.getX(), (int)p.getY());
 		fSpline.paint(g);
 	}
 
