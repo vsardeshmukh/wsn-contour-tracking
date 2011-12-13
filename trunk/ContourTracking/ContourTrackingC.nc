@@ -59,6 +59,7 @@ implementation
   void report_received() { call Leds.led2Toggle(); }
 
   event void Boot.booted() {
+		local.version = 0;
     local.interval = DEFAULT_INTERVAL;
     local.threshold = DEFAULT_THRESHOLD;
     local.id = TOS_NODE_ID;
@@ -67,11 +68,39 @@ implementation
       ;//report_problem();
   }
 
+	void startTimer() {
+		uint32_t timestamp = call GlobalTime.getLocalTime();
+		bool synced = (call GlobalTime.local2Global(&timestamp) == SUCCESS);
+		uint32_t gTimestamp = timestamp;
+		if(synced)
+			call Timer.startOneShot(local.interval - gTimestamp % local.interval);
+		else
+			call Timer.startOneShot(local.interval);
+  }
+
+  event void Timer.fired() {
+		if (local.clock > 0) {
+			local.clock += local.interval;
+			if (call Read.read() != SUCCESS)
+				report_problem();
+		}
+		startTimer();
+  }
+
+/*
   void startTimer() {
     call Timer.startPeriodic(local.interval);
     reading = 0;
   }
 
+	event void Timer.fired() {
+		if (local.clock > 0) {
+			local.clock += local.interval;
+			if (call Read.read() != SUCCESS)
+				report_problem();
+		}
+	}
+*/
   event void RadioControl.startDone(error_t error) {
     startTimer();
   }
@@ -102,18 +131,6 @@ implementation
 
 		local.clock = omsg->clock;
 		return msg;
-  }
-
-  /* At each sample period:
-     - if local sample buffer is full, send accumulated samples
-     - read next sample
-  */
-  event void Timer.fired() {
-	if (local.clock > 0) {
-	  local.clock += local.interval;
-	  if (call Read.read() != SUCCESS)
-		report_problem();
-	}
   }
 
   event void AMSend.sendDone(message_t* msg, error_t error) {
