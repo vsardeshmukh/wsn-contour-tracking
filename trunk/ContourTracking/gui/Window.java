@@ -207,6 +207,26 @@ class Window {
 				public void actionPerformed(ActionEvent e) { clearData(); }
 				} );
 
+		// Record snapshots.
+		JButton recButton = makeButton("Record", new ActionListener() {
+			public void actionPerformed(ActionEvent e) { 
+				if(e.getActionCommand() == "Record") {
+					parent.startRecording(); 
+					((JButton)e.getSource()).setText("Stop");
+				} else {
+					parent.stopRecording();
+					((JButton)e.getSource()).setText("Record");
+				}
+			}
+		} );
+
+		// Play snapshots.
+		JButton playButton = makeButton("Play", new ActionListener() {
+			public void actionPerformed(ActionEvent e) { 
+				new EventContourTrackingPlayer().show();
+			}
+		} );
+
 		// Adjust X-axis zoom.
 		Box xControl = new Box(BoxLayout.Y_AXIS);
 		xLabel = makeLabel("", JLabel.CENTER);
@@ -239,6 +259,8 @@ class Window {
 
 		Box controls = new Box(BoxLayout.X_AXIS);
 		controls.add(clearButton);
+		controls.add(recButton);
+		controls.add(playButton);
 		controls.add(Box.createHorizontalGlue());
 		controls.add(Box.createRigidArea(new Dimension(20, 0)));
 		controls.add(sampleLabel);
@@ -257,9 +279,11 @@ class Window {
 		frame.setSize(main.getPreferredSize());
 		frame.getContentPane().add(main);
 		frame.setVisible(true);
+		frame.setLocationRelativeTo(null);
+		frame.setExtendedState(JFrame.MAXIMIZED_BOTH); 
 		frame.addWindowListener(new WindowAdapter() {
-				public void windowClosing(WindowEvent e) { System.exit(0); }
-				});
+			public void windowClosing(WindowEvent e) { System.exit(0); }
+		});
 	}
 
 	/* User operation: clear data */
