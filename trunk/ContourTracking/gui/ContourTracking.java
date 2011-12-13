@@ -13,8 +13,10 @@ import net.tinyos.util.*;
 import java.io.*;
 import java.util.*;
 import java.lang.Math;
+import java.awt.Color;
 import java.awt.geom.Point2D;
 import java.text.DecimalFormat;
+import java.text.SimpleDateFormat;
 
 /* The "ContourTracking" demo app. Displays graphs showing data received from
    the ContourTracking mote application, and allows the user to:
@@ -38,7 +40,7 @@ import java.text.DecimalFormat;
    synchronization is needed when updating state based on received messages.
 */
 
-public class ContourTracking extends TimerTask implements MessageListener
+public class ContourTracking extends TimerTask implements MessageListener, Serializable
 {
 	static final Integer MOTE_IDs[];
 	static {
@@ -51,7 +53,8 @@ public class ContourTracking extends TimerTask implements MessageListener
 		BL, B, BR, L, R, UL, U, UR
 	}
 
-	class Mote {
+	class Mote implements Serializable {
+		Color fColor;
 		int fThreshold;
 		int fSample;
 		long fSampleTimestamp;
@@ -59,6 +62,14 @@ public class ContourTracking extends TimerTask implements MessageListener
 			fThreshold = threshold;
 			fSample = sample;
 			fSampleTimestamp = timestamp;
+		}
+
+		Color getColor() {
+			return fColor;
+		}
+
+		void setColor(Color color) {
+			fColor = color;
 		}
 
 		int getSample() {
@@ -74,13 +85,7 @@ public class ContourTracking extends TimerTask implements MessageListener
 		}
 	}
 
-	class SnapshotChangeEvent extends EventObject {
-		public SnapshotChangeEvent(Object source) {
-			super(source);
-		}
-	}
-
-	class Blob {
+	class Blob implements Serializable {
 		Snapshot fSnapshot;
 		Set<Integer> fMotes;
 		Blob(Snapshot snapshot) {
@@ -101,10 +106,13 @@ public class ContourTracking extends TimerTask implements MessageListener
 
 			// search for neighbors BR, R, UL, U, UR
 			Set<Position> positions = new TreeSet<Position>();
-			positions.add(Position.BR);
+			positions.add(Position.L);
+			positions.add(Position.B);
 			positions.add(Position.R);
-			positions.add(Position.UL);
 			positions.add(Position.U);
+			positions.add(Position.BL);
+			positions.add(Position.BR);
+			positions.add(Position.UL);
 			positions.add(Position.UR);
 			for(Position pos: positions) {
 				int neighborId = fSnapshot.getMoteNeighborId(id, pos);
@@ -159,17 +167,82 @@ public class ContourTracking extends TimerTask implements MessageListener
 		}
 	}
 
-	class Snapshot {
-		ContourTracking fContourTracker;
+	static class Event implements Serializable {
+		enum Direction {
+			EAST, WEST, SOUTH, NORTH, NE, NW, SE, SW
+		}
+
+		boolean FORM, VANISH, MERGE, SPLIT, EXPAND, SHRINK, MOVE;
+		Direction fDir;
+
+		void setFORM() { FORM = true; }
+		void setVANISH() { VANISH = true; }
+		void setMERGE() { MERGE = true; }
+		void setSPLIT() { SPLIT = true; }
+		void setEXPAND() { EXPAND = true; }
+		void setSHRINK() { SHRINK = true; }
+		void setMOVE(Direction dir) { MOVE = true; fDir = dir; }
+
+		boolean isMERGE() { return MERGE; }
+		boolean isSPLIT() { return SPLIT; }
+
+		public String toString() {
+			String line = "";
+			if(MOVE) {
+				switch(fDir) {
+					case EAST:
+						line = "MOVED EAST";
+						break;
+					case WEST:
+						line = "MOVED WEST";
+						break;
+					case SOUTH:
+						line = "MOVED SOUTH";
+						break;
+					case NORTH:
+						line = "MOVED NORTH";
+						break;
+					case NE:
+						line = "MOVED NE";
+						break;
+					case NW:
+						line = "MOVED NW";
+						break;
+					case SE:
+						line = "MOVED SE";
+						break;
+					case SW:
+						line = "MOVED SW";
+						break;
+				}
+			}
+
+			if(MERGE)
+				line += line.length() > 0 ? ", MERGE" : "MERGE";
+			if(SPLIT)
+				line += line.length() > 0 ? ", SPLIT" : "SPLIT";
+			if(EXPAND)
+				line += line.length() > 0 ? ", EXPAND" : "EXPAND";
+			if(SHRINK)
+				line += line.length() > 0 ? ", SHRINK" : "SHRINK";
+			if(FORM)
+				line += line.length() > 0 ? ", FORM" : "BLOB FORM";
+			if(VANISH)
+				line += line.length() > 0 ? ", VANISH" : "BLOB VANISH";
+			return line.length() == 0 ? "No Event" : line;
+		}
+	}
+
+	class Snapshot implements Serializable {
 		Map<Integer, Mote> fMoteGrid;
 		Set<Blob> fBlobs;
+		Event fEvent;
 		Snapshot(ContourTracking contourTracker) {
-			fContourTracker = contourTracker;
 			fMoteGrid = new TreeMap<Integer, Mote>();
 			fBlobs = new HashSet<Blob>();
-			for(int i = 0; i < fContourTracker.getMotesCount(); i++) {
+			for(int i = 0; i < contourTracker.getMotesCount(); i++) {
 				int id = window.moteListModel.get(i);
-				Mote mote = new Mote(fContourTracker.getThreshold(), data.getData(id, data.maxX(id)), data.getLastSampleTimestamp(id));
+				Mote mote = new Mote(contourTracker.getThreshold(), data.getData(id, data.maxX(id)), data.getLastSampleTimestamp(id));
 				putMote(id, mote);
 			}
 
@@ -194,6 +267,14 @@ public class ContourTracking extends TimerTask implements MessageListener
 			}
 		}
 
+		Event getEvent() {
+			return fEvent;
+		}
+
+		void setEvent(Event event) {
+			fEvent = event;
+		}
+			
 		int size() {
 			return fMoteGrid.size();
 		}
@@ -239,7 +320,7 @@ public class ContourTracking extends TimerTask implements MessageListener
 			int idx = 0;
 			Integer key = MOTE_IDs[id-1];
 			for(Integer k: fMoteGrid.keySet()) {
-				if(k == key)
+				if(k.intValue() == key.intValue())
 					return idx;
 
 				idx++;
@@ -295,19 +376,19 @@ public class ContourTracking extends TimerTask implements MessageListener
 			if(getMoteIndex(thisId) == -1 || getMoteIndex(thatId) == -1)
 				return false;
 				
-			if(getMoteNeighborId(thisId, Position.BL) == thatId)
-				return true;
-			else if(getMoteNeighborId(thisId, Position.B) == thatId)
-				return true;
-			else if(getMoteNeighborId(thisId, Position.BR) == thatId)
+			if(getMoteNeighborId(thisId, Position.B) == thatId)
 				return true;
 			else if(getMoteNeighborId(thisId, Position.L) == thatId)
 				return true;
 			else if(getMoteNeighborId(thisId, Position.R) == thatId)
 				return true;
-			else if(getMoteNeighborId(thisId, Position.UL) == thatId)
-				return true;
 			else if(getMoteNeighborId(thisId, Position.U) == thatId)
+				return true;
+			else if(getMoteNeighborId(thisId, Position.BL) == thatId)
+				return true;
+			else if(getMoteNeighborId(thisId, Position.BR) == thatId)
+				return true;
+			else if(getMoteNeighborId(thisId, Position.UL) == thatId)
 				return true;
 			else if(getMoteNeighborId(thisId, Position.UR) == thatId)
 				return true;
@@ -374,12 +455,14 @@ public class ContourTracking extends TimerTask implements MessageListener
 
 			System.out.println("Earliest Sample Timestamp: " + getEarliestSampleTimestamp());
 			System.out.println("Latest Sample Timestamp: " + getLatestSampleTimestamp());
+			System.out.println("Timestamp Difference: " + (getLatestSampleTimestamp() - getEarliestSampleTimestamp()));
+			System.out.println("Event(s): " + fEvent);
 		}
 	}
 
-	MoteIF mote;
-	Data data;
-	Window window;
+	transient MoteIF mote;
+	transient Data data;
+	transient Window window;
 
 	/* The current sampling period. If we receive a message from a mote
 	   with a newer version, we update our interval. If we receive a message
@@ -388,11 +471,53 @@ public class ContourTracking extends TimerTask implements MessageListener
 	   version and broadcast the new interval and version. */
 	int interval = Constants.DEFAULT_INTERVAL;
 	int threshold = Constants.DEFAULT_THRESHOLD;
-	int version = -1;
+	int version = 0;
 
-	/* event tracking info - Farley */
-	private boolean lightEventMode = true;
+	boolean fRecording;
+	transient ObjectOutputStream fOut;
+	public boolean startRecording() {
+		if(fRecording)
+			return false;
+
+		Calendar calendar = new GregorianCalendar();
+		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd-HHmmss");
+		String filename = dateFormat.format(calendar.getTime()) + ".ect";
+		try {
+			FileOutputStream fos = new FileOutputStream(filename);
+			fOut = new ObjectOutputStream(fos);
+			if(!snapshots.isEmpty());
+				fOut.writeObject(snapshots.lastElement());
+		} catch(IOException e) {
+			e.printStackTrace();
+			return false;
+		}
+		
+		fRecording = true; 
+		return true;
+	}
+
+	public boolean stopRecording() { 
+		if(!fRecording)
+			return false;
+
+		try {
+			fOut.close();
+		} catch(IOException e) {
+			e.printStackTrace();
+		}
+
+		fRecording = false;
+		return true;
+	}
+
+	/* event tracking info */
 	private Vector<Snapshot> snapshots = new Vector<Snapshot>();
+	Snapshot getLatestSnapshot() {
+		if(!snapshots.isEmpty()) {
+			return snapshots.lastElement();
+		}
+		return null;
+	}
 
 	/* TimerTask: update motes clock periodically */
 	public void run() {
@@ -407,12 +532,11 @@ public class ContourTracking extends TimerTask implements MessageListener
 		window.setup();
 		mote = new MoteIF(PrintStreamMessenger.err);
 		mote.registerListener(new ContourTrackingMsg(), this);
-		new Timer().schedule(this, 0, 1000);
+		new Timer().schedule(this, 0, 500);
 	}
 
 	private synchronized boolean track() {
 		Snapshot snapshot = new Snapshot(this);
-		snapshot.debug();
 		if(snapshots.isEmpty()) {
 			snapshots.add(snapshot);
 			return true;
@@ -420,13 +544,21 @@ public class ContourTracking extends TimerTask implements MessageListener
 
 		Snapshot prevSnapshot = snapshots.lastElement();
 		if(!snapshot.differs(prevSnapshot)) {
-			System.out.println("no significant change with the previous snapshot");
+			//System.out.println("no significant change with the previous snapshot");
 			snapshots.remove(prevSnapshot);
 			snapshots.add(snapshot);
 			return true;
 		}
 
 		detect(prevSnapshot, snapshot);
+		snapshot.debug();
+		if(fRecording) {
+			try {
+				fOut.writeObject(snapshot);
+			} catch(IOException e) {
+				e.printStackTrace();
+			}
+		}
 		snapshots.add(snapshot);
 		if(snapshots.size() > 10)
 			snapshots.remove(snapshots.firstElement());
@@ -452,37 +584,35 @@ public class ContourTracking extends TimerTask implements MessageListener
 		if(fromSnapshot == null || toSnapshot == null)
 			return;
 
-		String line = "";
+		Event event = new Event();
 		// MOVE: neighboring or intersect with only one blob of the same size
 		for(Blob toBlob: toSnapshot.getBlobs()) {
 			for(Blob fromBlob: fromSnapshot.getBlobs()) {
 				if(toBlob.size() == fromBlob.size() && (toBlob.isNeighboring(fromBlob) || toBlob.isIntersected(fromBlob))) {
 					Point2D from = fromBlob.getCenter();
 					Point2D to = toBlob.getCenter();
-					System.out.println("from(" + from.getX() + ", " + from.getY() + "), to(" + to.getX() + ", " + to.getY() + ")");
+					//System.out.println("from(" + from.getX() + ", " + from.getY() + "), to(" + to.getX() + ", " + to.getY() + ")");
 					double dirX = roundTwoDecimals(to.getX() - from.getX());
 					double dirY = roundTwoDecimals (to.getY() - from.getY());
 					if(dirX>0) {
 						if(dirY>0)
-							line = "MOVED in NE";
+							event.setMOVE(Event.Direction.NE);
 						else if(dirY<0)
-							line = "MOVED in SE";
+							event.setMOVE(Event.Direction.SE);
 						else
-							line = "MOVED in E";
+							event.setMOVE(Event.Direction.EAST);
 					}	else if(dirX<0) {
 						if(dirY>0)
-							line = "MOVED in NW";
+							event.setMOVE(Event.Direction.NW);
 						else if(dirY<0)
-							line = "MOVED in SW";
+							event.setMOVE(Event.Direction.SW);
 						else
-							line = "MOVED in W";
+							event.setMOVE(Event.Direction.WEST);
 					}	else {
 						if(dirY>0)
-							line = "MOVED in N";
+							event.setMOVE(Event.Direction.NORTH);
 						else if(dirY<0)
-							line = "MOVED in S";
-						else
-							line = "No Move";
+							event.setMOVE(Event.Direction.SOUTH);
 					}
 				}
 			}
@@ -497,7 +627,7 @@ public class ContourTracking extends TimerTask implements MessageListener
 			}
 
 			if(intersections > 1) {
-				line += line.length() > 0 ? ", MERGE" : "MERGE";
+				event.setMERGE();
 				break;
 			}
 		}
@@ -511,7 +641,7 @@ public class ContourTracking extends TimerTask implements MessageListener
 			}
 
 			if(intersections > 1) {
-				line += line.length() > 0 ? ", SPLIT" : "SPLIT";
+				event.setSPLIT();
 				break;
 			}
 		}
@@ -522,21 +652,21 @@ public class ContourTracking extends TimerTask implements MessageListener
 		int fromSizeOfBlobs = fromSnapshot.sizeOfBlobs();
 		int toSizeOfBlobs = toSnapshot.sizeOfBlobs();
 		if(fromSizeOfBlobs < toSizeOfBlobs) {
-			line += line.length() > 0 ? ", EXPAND" : "EXPAND";
+			event.setEXPAND();
 		} else if(fromSizeOfBlobs > toSizeOfBlobs) {
-			line += line.length() > 0 ? ", SHRINK" : "SHRINK";
+			event.setSHRINK();
 		}
 
 		// FORM
 		// VANISH
-		if(fromSnapshot.blobCount() < toSnapshot.blobCount())
-			line += line.length() > 0 ? ", FORM" : "BLOB FORM";
-		else if(fromSnapshot.blobCount() > toSnapshot.blobCount())
-			line += line.length() > 0 ? ", VANISH" : "BLOB VANISH";
+		if(!event.isSPLIT() && fromSnapshot.blobCount() < toSnapshot.blobCount())
+			event.setFORM();
+		else if(!event.isMERGE() && fromSnapshot.blobCount() > toSnapshot.blobCount())
+			event.setVANISH();
 
-		line += line.length() > 0 ? ", " + toSnapshot.getLatestSampleTimestamp() : "No New Event; " + toSnapshot.getLatestSampleTimestamp() ;
-		window.showText(line);
-		System.out.println("line: " + line);
+		toSnapshot.setEvent(event);
+		window.showText(event + ", " + toSnapshot.getLatestSampleTimestamp());
+		//System.out.println(event + ", " + toSnapshot.getLatestSampleTimestamp());
 	}
 
 	/* The data object has informed us that nodeId is a previously unknown
