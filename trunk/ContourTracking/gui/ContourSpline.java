@@ -1,7 +1,7 @@
 import java.util.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.awt.geom.Line2D;
+import java.awt.geom.*;
 import javax.swing.*;
 
 /** this class represents a cubic polynomial */
@@ -234,10 +234,12 @@ class NatCubicClosed extends NatCubic{
 public class ContourSpline {
 	NatCubicClosed fSpline;
 	Vector<Point> fPoints;
+	Area fArea;
 
 	public ContourSpline() {
 		fSpline = new NatCubicClosed();
 		fPoints = new Vector<Point>();
+		fArea = new Area();
 	}
 
 	public void addPoint(int x, int y) {
@@ -245,44 +247,105 @@ public class ContourSpline {
 		//return fSpline.addPoint(x, y);
 	}
 
-	public void sort() {
-		if(fPoints.isEmpty())
-			return;
-
-		int count = fPoints.size();
-		int sumX = 0, sumY = 0;
-		for(Point p: fPoints) {
-			sumX += p.getX();
-			sumY += p.getY();
-		}
-		int centerX = sumX / count + -7;
-		int centerY = sumY / count + 9;
-
-		Map<Double, Point> sortedPoints = new TreeMap<Double, Point>();
-		for(Point p: fPoints) {
-			double atan = Math.atan2(p.getX() - centerX, p.getY() - centerY);
-			//double atan = Math.atan2(p.getY() - centerY, p.getX() - centerX);
-			if(sortedPoints.get(new Double(atan)) != null)
-				System.out.println("two points of the same atan!!!");
-			sortedPoints.put(new Double(atan), p);
-		}
-
-		//System.out.printf("unsorted points count: %d, sorted points count: %d\n", fPoints.size(), sortedPoints.size());
-		fPoints.clear();
-		for(Map.Entry<Double, Point> entry: sortedPoints.entrySet()) {
-			fPoints.add(entry.getValue());
-		}
+	public void addShape(Shape shape) {
+		fArea.add(new Area(shape));
 	}
 
 	public void paint(Graphics g) {
-		sort();
-		for(Point p: fPoints)
-			fSpline.addPoint((int)p.getX(), (int)p.getY());
-		fSpline.paint(g);
+		Vector<Vector<Point>> pointLists = new Vector<Vector<Point>>();
+		Point prevVector = null;
+		for(PathIterator itr = fArea.getPathIterator(null); !itr.isDone(); itr.next()) {
+			double[] coords = new double[6];
+			switch(itr.currentSegment(coords)) {
+				case PathIterator.SEG_MOVETO:
+					prevVector = null;
+					pointLists.add(new Vector<Point>());
+					pointLists.lastElement().add(new Point((int)coords[0], (int)coords[1]));
+					//System.out.printf("new spline and add control point(%d, %d)\n", (int)coords[0], (int)coords[1]);
+					break;
+				case PathIterator.SEG_LINETO: {
+					Point	prev = pointLists.lastElement().lastElement();
+					if(prevVector == null) {
+						prevVector = new Point((int)(coords[0] - prev.getX()), (int)(coords[1] - prev.getY()));
+						pointLists.lastElement().add(new Point((int)coords[0], (int)coords[1]));
+					} else {
+						Point vector = new Point((int)(coords[0] - prev.getX()), (int)(coords[1] - prev.getY()));
+						double multiple = (prevVector.getX() != 0) ? vector.getX() / prevVector.getX() : vector.getY() / prevVector.getY();
+						//System.out.printf("prev vector(%d, %d), vector(%d, %d), multiptle: %f\n", 
+						//									(int)prevVector.getX(), (int)prevVector.getY(), (int)vector.getX(), (int)vector.getY(), multiple);
+						if(prevVector.getX() * multiple == vector.getX() && prevVector.getY() * multiple == vector.getY()) {
+							//System.out.printf("remove control point(%d, %d)\n", (int)prev.getX(), (int)prev.getY());
+							pointLists.lastElement().remove(prev);
+							prev = pointLists.lastElement().lastElement();
+						}
+						pointLists.lastElement().add(new Point((int)coords[0], (int)coords[1]));
+						prevVector = new Point((int)(coords[0] - prev.getX()), (int)(coords[1] - prev.getY()));
+					}
+					//System.out.printf("add control point(%d, %d)\n", (int)coords[0], (int)coords[1]);
+					break;
+				}
+				case PathIterator.SEG_CLOSE:
+				default:
+			}
+		}
+
+		Graphics2D g2d = (Graphics2D)g;
+		for(Vector<Point> points: pointLists) {
+			NatCubicClosed spline = new NatCubicClosed();
+			System.out.println("add cpoints to spline --------------------");
+			for(Point p: points) {
+				spline.addPoint((int)p.getX(), (int)p.getY());
+				System.out.printf("add cpoint(%d, %d) to spline\n", (int)p.getX(), (int)p.getY());
+			}
+			Stroke stroke = g2d.getStroke();
+			g2d.setStroke(new BasicStroke(3));
+			spline.paint(g);
+			g2d.setStroke(stroke);
+		}
+		for(Vector<Point> points: pointLists) {
+			for(Point p: points) {
+				Color c = g2d.getColor();
+				g2d.setColor(Color.GREEN);
+				g.fillOval((int)p.getX(), (int)p.getY(), 5, 5);
+				g2d.setColor(c);
+			}
+		}
 	}
 
 	public static void main(String[] args) {
-		JFrame frame = new JFrame("Contour Spline Test");
+		Area area1 = new Area(new Rectangle(50, 50, 10, 10));
+		Area area2 = new Area(new Rectangle(40, 40, 10, 10));
+		Polygon poly = new Polygon();
+		poly.addPoint(40, 50);
+		poly.addPoint(50, 60);
+		poly.addPoint(60, 50);
+		poly.addPoint(50, 40);
+		Area area = new Area(poly);
+		area.add(area1);
+		area.add(area2);
+		double [] coords = new double[6];
+		for (PathIterator pi = area.getPathIterator(null); !pi.isDone(); pi.next()) {
+			int type = pi.currentSegment(coords);
+			switch(type) {
+				case PathIterator.SEG_MOVETO:
+					System.out.printf("SEG_MOVETO (%d, %d)\n", (int)coords[0], (int)coords[1]);
+					break;
+				case PathIterator.SEG_LINETO:
+					System.out.printf("SEG_LINETO (%d, %d)\n", (int)coords[0], (int)coords[1]);
+					break;
+				case PathIterator.SEG_QUADTO:
+					System.out.printf("SEG_QUADTO (%d, %d)\n", (int)coords[0], (int)coords[1]);
+					break;
+				case PathIterator.SEG_CUBICTO:
+					System.out.printf("SEG_CUBICTO (%d, %d)\n", (int)coords[0], (int)coords[1]);
+					break;
+				case PathIterator.SEG_CLOSE:
+					System.out.printf("SEG_CLOSE (%d, %d)\n", (int)coords[0], (int)coords[1]);
+					break;
+			}
+		}
+		/*
+			 JFrame frame = new JFrame("Contour Spline Test");
 		//frame.setBackground(bgColor);
 		//content.setBackground(bgColor);
 		frame.setSize(200, 200);
@@ -290,13 +353,13 @@ public class ContourSpline {
 		//frame.addWindowListener(new ExitListener());
 		frame.setVisible(true);
 		frame.addWindowListener(new WindowAdapter() {
-			public void windowClosing(WindowEvent e) { System.exit(0); }
+		public void windowClosing(WindowEvent e) { System.exit(0); }
 		});
 
 		frame.getContentPane().add(new JComponent() {
-			public void paintComponent(Graphics g) {
-				Graphics2D g2 = (Graphics2D) g;
-				g2.setStroke(new BasicStroke(5));
+		public void paintComponent(Graphics g) {
+		Graphics2D g2 = (Graphics2D) g;
+		g2.setStroke(new BasicStroke(5));
 
 				ContourSpline spline = new ContourSpline();
 				int x = 100, y = 100;
@@ -308,5 +371,6 @@ public class ContourSpline {
 				spline.paint(g);
 			}
 		});
+		*/
 	}
 }
